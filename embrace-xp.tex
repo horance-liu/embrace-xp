@@ -1,0 +1,79 @@
+\documentclass[a4paper, 10pt]{book}
+%1m = 39.4 inch
+%大18开 （18.5cm * 23cm)
+%\usepackage[left=3.25cm, right=3.25cm, top=2.3cm,bottom=1.4cm]{geometry}
+\usepackage{geometry}
+\geometry{left=3.75cm,right=3.25cm,top=3cm,bottom=2.5cm}
+
+%% en_preamble包含基本的宏包配置
+\input{style/en_preamble}
+
+%% 如果不写中文的话就不需要引用xecjk_preamble里面的配置
+\input{style/xecjk_preamble}
+
+\input{style/coding}
+
+% \usepackage[
+%   placement=center,
+%   angle=45,
+%   scale=20,
+%   color=black!40,
+%   %hshift=60,
+%   %vshift=-5
+% ]{background}
+
+% \backgroundsetup{contents={样章}}
+% \backgroundsetup{contents={\includegraphics[width=0.2\textwidth]{figures/cock.jpg}}}
+
+\newcommand{\myclearpage}{\clearpage{\pagestyle{empty}\cleardoublepage}}
+\newcommand{\mydedicate}{\clearpage{\pagestyle{empty}\cleardedicatepage}}
+
+\begin{document}
+
+\frontmatter
+\pagestyle{empty}
+
+\def\titlename{拥抱极限编程}
+\def\subtitle{Embrace Extreme Programming}
+\def\authors{刘光聪\ 著}
+% \def\orgnization{\ascii{}}
+
+\input{style/title}
+\myclearpage
+
+\mydedicate
+
+\tableofcontents
+\myclearpage
+
+\def\thelstlisting{\thechapter-\arabic{lstlisting}}
+%% 中文习惯是设定首行缩进为2em。
+%% 注意此设置一定要在document环境之中，这可能与\setlength作用范围相关
+\setlength{\parindent}{2em}
+
+%%%%%%%%%%%%%%%%%%%%%%
+%%开始正文，页面计数从正文开始
+\mainmatter
+\setcounter{page}{1}
+\pagestyle{fancy}
+
+\input{contents/xunit.tex}
+
+%%%%%%%%%%%%%%%%%%％%%
+\appendix
+
+%\part{附录}
+%\input{contents/appendix/k8s-cluster.tex}
+
+%%%%%%%%%%%%%%%%%％%%
+%\backmatter
+%\listoffigures
+%\myclearpage
+
+%\listoftables
+%\myclearpage
+
+%\bibliographystyle{alpha}
+%\input{contents/biblio}
+
+\end{document}

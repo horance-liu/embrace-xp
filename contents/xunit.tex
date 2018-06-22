@@ -1,0 +1,869 @@
+\begin{savequote}[45mm]
+\ascii{Any fool can write code that a computer can understand. Good programmers write code that humans can understand.}
+\qauthor{\ascii{- Martin Flower}}
+\end{savequote}
+
+\chapter{实现xUnit} 
+\label{ch:ice-breaker}
+
+\begin{content}
+
+\end{content}
+
+\section{提出问题}
+	
+\begin{content}
+
+\subsection{xUnit架构}
+
+\subsection{接口设计}
+
+使用\ascii{C++}描述\ascii{xUnit}的样例，相对于\ascii{Google Test}，此处做了如下几个方面的革新。
+
+\begin{enum}
+  \eitem{\ascii{在同一个类域内，使得TEST与SETUP/TEARDOWN关系更加紧密；}}
+  \eitem{\ascii{使用字符串描述用例；}}
+  \eitem{\ascii{避免setUp, SetUp, setup大小写混用导致的错误。}}
+\end{enum}
+
+
+\begin{leftbar}
+ \begin{c++}
+FIXTURE(SimpleTest) {
+  int* base = nullptr;   
+
+  SETUP {
+    base = new int(10);
+  }
+
+  TEST("increase nothing") {
+    ASSERT_EQ(20, *base + 0);
+  }
+  
+  TEST("sum of two integers") {
+    ASSERT_EQ(20, *base + 10);
+  }
+ 
+  TEARDOWN {
+    delete base;
+  }
+}; 
+ \end{c++}
+\end{leftbar}
+
+\end{content}
+
+\section{破冰之旅}
+
+\begin{content}
+
+\subsection{环境准备}
+
+创建一个项目并命名为\ascii{mars}，然后在项目的顶层目录初始化一个\ascii{git}库。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{初始化git库}}] 
+$ git init 
+ \end{c++}
+\end{leftbar}  
+
+\subsubsection{项目组织}
+
+项目目录结构如下。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{项目组织}}]
+mars
+├── build
+├── CMakeLists.txt
+├── include
+│   └── mars
+├── src
+│   ├── CMakeLists.txt
+│   └── mars
+└── test
+    ├── CMakeLists.txt
+    └── mars
+ \end{c++}
+\end{leftbar}
+
+\subsubsection{CMakeList实现}
+
+主控的\ascii{CMakeLists.txt}的内容如下：
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{CMakeLists.txt}}]
+project(mars)                                                                                  
+cmake_minimum_required(VERSION 3.10)
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
+
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include")
+
+add_subdirectory(src)
+add_subdirectory(test)
+
+install(DIRECTORY include/mars DESTINATION include)
+ \end{c++}
+\end{leftbar}
+
+\ascii{src\CMakeLists.txt}完成\ascii{mars}库的构建。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{src/CMakeLists.txt}}]
+FILE(GLOB_RECURSE all_files
+*.cpp
+*.cc
+*.c++                                                                                          
+*.c
+*.C)
+  
+add_library(mars STATIC ${all_files})
+install(TARGETS mars ARCHIVE DESTINATION lib)
+ \end{c++}
+\end{leftbar}
+
+\ascii{test\CMakeLists.txt}完成\ascii{mars-test}应用程序的构建，执行\ascii{mars}的测试用例。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{test/CMakeLists.txt}}]
+file(GLOB_RECURSE all_files
+*.cpp
+*.cc
+*.c++
+*.c
+*.C)
+  
+add_executable(mars-test ${all_files})
+target_link_libraries(mars-test mars gtest gtest_main pthread)
+ \end{c++}
+\end{leftbar}
+
+提交代码。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{提交代码}}] 
+$ git add -A .
+$ git commit -m"setup project"
+ \end{c++}
+\end{leftbar}  
+
+\subsection{起航}
+
+万事开头难，第一个用例跑起来并不容易。此处设计实现了一个最简单的测试用例，用于测试加法运算。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{test/mars/core/TestCaseSpec.cc}}]
+#include <gtest/gtest.h>
+#include "mars/core/TestCase.h"
+
+namespace {
+  struct AdditionTest : TestCase {
+    void run() override {
+      ASSERT_EQ(2, 1 + 1);
+    }
+  };
+
+  void run(TestCase& test) {
+    test.run();
+  }
+}
+
+TEST(AdditionTest, sum_of_two_integers) {
+  AdditionTest test;
+  run(test);
+}
+ \end{c++}
+\end{leftbar}
+
+\subsubsection{通过编译}
+
+为了能够扩展用户的自定义行为，此处引入了多态技术，用户通过子类覆写\ascii{TestCase::run}成员函数。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{include/mars/core/TestCase.h}}]
+#ifndef AF6F59CF_EEF6_49C0_A674_EE599B415F7D
+#define AF6F59CF_EEF6_49C0_A674_EE599B415F7D
+
+struct TestCase {
+  virtual ~TestCase() {}
+  virtual void run() = 0;
+};
+
+#endif
+  \end{c++}
+\end{leftbar}
+
+\subsubsection{通过链接}
+
+此处定义实现了一个空的\ascii{TestCase.cc}文件，仅仅为了\ascii{src/CMakeLists.txt}生成的\ascii{libmars.a}不至于为空。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{src/mars/core/TestCase.cc}}]
+#include "mars/core/TestCase.h"
+ \end{c++}
+\end{leftbar}
+
+\subsubsection{通过测试}
+
+接下来，在\ascii{build}的临时目录中，使用\ascii{cmake}构建工程。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{构建工程}}]
+$ mkdir -p build && cd build
+$ cmake ..
+$ make
+ \end{c++}
+\end{leftbar}
+
+运行测试。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{运行测试}}]
+$ test/mars-test
+Running main() from gtest_main.cc
+[==========] Running 1 test from 1 test case.
+[----------] Global test environment set-up.
+[----------] 1 test from AdditionTest
+[ RUN      ] AdditionTest.sum_of_two_integers
+[       OK ] AdditionTest.sum_of_two_integers (0 ms)
+[----------] 1 test from AdditionTest (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test case ran. (1 ms total)
+[  PASSED  ] 1 test.
+ \end{c++}
+\end{leftbar}
+
+\subsubsection{提交代码}
+
+每当通过测试后，立即提交代码到\ascii{Git}库。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{提交代码}}]
+$ git add -A .
+$ git commit -m"pass first test case"
+ \end{c++}
+\end{leftbar}
+
+\end{content}
+
+\section{算法骨架}
+
+\begin{content}
+
+一般地，在执行测试前需要预置\ascii{setUp}实施环境的初始化工作。因此，对既有的用例实施重构。
+
+\subsection{前置}
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{test/mars/core/TestCaseSpec.cc}}]
+#include <gtest/gtest.h>
+#include "mars/core/TestCase.h"
+
+namespace {
+  struct AdditionTest : TestCase {
+  private:
+    void setUp() override {
+      base = 10;
+    }
+
+    void runTest() override {
+      ASSERT_EQ(20, base + 10);
+    }
+
+  private:
+    int base = 0;
+  };
+}
+
+TEST(AdditionTest, sum_of_two_integers) {
+  AdditionTest test;
+  test.run();
+}
+ \end{c++}
+\end{leftbar}
+
+\subsubsection{通过编译}
+
+重构\ascii{TestCase}，仅公开\ascii{run}方法，并移除运行时多态的特性，它负责用例执行的运行时的算法骨架。转移运行时多态行为至私有的两个虚函数，用户可以根据自己的场景定制\ascii{setUp}与\ascii{runTest}，分别完成用例的初始化，及其测试执行。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{include/mars/core/TestCase.h}}]
+#ifndef AF6F59CF_EEF6_49C0_A674_EE599B415F7D
+#define AF6F59CF_EEF6_49C0_A674_EE599B415F7D
+
+struct TestCase {
+  virtual ~TestCase() {}
+
+  void run();
+
+private:
+  virtual void setUp() {}
+  virtual void runTest() {}
+};
+
+#endif
+  \end{c++}
+\end{leftbar}
+
+\subsubsection{通过测试}
+
+实现\ascii{TestCase::run}的主体逻辑。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{src/mars/core/TestCase.cc}}]
+#include "mars/core/TestCase.h"
+
+void TestCase::run() {
+  setUp();
+  runTest();
+}
+
+ \end{c++}
+\end{leftbar}
+
+测试通过，提交\ascii{Git}库。
+
+\subsection{后置}
+
+同理，测试执行后使用\ascii{tearDown}完成现场清理，用户通过定制私有的虚函数\ascii{tearDown}完成。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{test/mars/core/TestCaseSpec.cc}}]
+#include <gtest/gtest.h>
+#include "mars/core/TestCase.h"
+
+namespace {
+  struct AdditionTest : TestCase {
+  private:
+    void setUp() override {
+      base = new int(10);
+    }
+
+    void runTest() override {
+      ASSERT_EQ(20, *base + 10);
+    }
+
+    void tearDown() override {
+      delete base;
+    }
+
+  private:
+    int* base = nullptr;
+  };
+}
+
+TEST(AdditionTest, sum_of_two_integers) {
+  AdditionTest test;
+  test.run();
+}
+ \end{c++}
+\end{leftbar}
+
+\subsubsection{通过编译}
+
+当用例执行完成后，\ascii{TestCase::tearDown}负责清理现场。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{include/mars/core/TestCase.h}}]
+#ifndef UUID_A5E84C94_CA28_4032_8014_2762BCE2D88F
+#define UUID_A5E84C94_CA28_4032_8014_2762BCE2D88F
+
+struct TestCase {
+  virtual ~TestCase() {}
+
+  void run();
+
+private:
+  virtual void setUp() {}
+  virtual void runTest() {}
+  virtual void tearDown() {}
+};
+
+#endif
+  \end{c++}
+\end{leftbar}
+
+\subsubsection{通过测试}
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{src/mars/core/TestCase.cc}}]
+#include "mars/core/TestCase.h"
+
+void TestCase::run() {
+  setUp();
+  runTest();
+  tearDown();
+}
+ \end{c++}
+\end{leftbar}
+
+测试通过，提交\ascii{Git}库。
+
+\end{content}
+
+\section{隐式树}
+
+\begin{content}
+
+如果每个用例都手动\ascii{run}一次，显得太笨拙了。显然，可以将测试用例打包，用一个简单的\ascii{for}循环依次执行每个用例。
+
+\subsection{引入TestSuite}
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{test/mars/core/TestSuiteSpec.cc}}]
+#include <gtest/gtest.h>
+#include "mars/core/TestCase.h"
+#include "mars/core/TestSuite.h"
+
+namespace {
+  struct AdditionTest : TestCase {
+  private:
+    void runTest() override {
+      ASSERT_EQ(20, base + 10);
+    }
+
+  private:
+    int base = 10;
+  };
+
+  struct SubtractionTest : TestCase {
+  private:
+    void runTest() override {
+      ASSERT_EQ(0, base - 10);
+    }
+
+  private:
+    int base = 10;
+  };
+}
+
+TEST(TestSuite, run_multi_test_cases_using_test_suite) {
+  TestSuite suite;
+  suite.add(new AdditionTest);
+  suite.add(new SubtractionTest);
+  suite.run();
+}
+ \end{c++}
+\end{leftbar}
+
+\subsubsection{通过编译}
+
+为了快速通过编译，创建\ascii{TestSuite}的头文件。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{include/mars/core/TestSuite.h}}]
+#ifndef UUID_18819C28_B404_45A7_BCB9_E2A39A447ECF
+#define UUID_18819C28_B404_45A7_BCB9_E2A39A447ECF
+
+struct TestCase;
+
+struct TestSuite {
+  void add(TestCase* test);
+  void run();
+};
+
+#endif
+ \end{c++}
+\end{leftbar}
+
+\subsubsection{通过链接}
+
+此时，构建工程链接失败。为了快速通过链接，可以快速实现\ascii{TestSuite.cc}。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{src/mars/core/TestSuite.cc}}]
+#include "mars/core/TestSuite.h"
+
+void TestSuite::add(TestCase* test) {
+}
+
+void TestSuite::run() {
+}
+ \end{c++}
+\end{leftbar}
+
+构建工程，并执行测试，测试居然通过了。显然，这是一个假象。
+
+\subsection{计数器}
+
+为了确定每个\ascii{TestCase}都被执行，可以简单定制一个用例的计数器\ascii{num}，最后断言\ascii{num}的值为\ascii{2}。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{test/mars/core/TestSuiteSpec.cc}}]
+#include <gtest/gtest.h>
+#include "mars/core/TestCase.h"
+#include "mars/core/TestSuite.h"
+
+namespace {
+  static int num = 0;
+
+  struct AdditionTest : TestCase {
+  private:
+    void runTest() override {
+      num++;
+      ASSERT_EQ(20, base + 10);
+    }
+
+  private:
+    int base = 10;
+  };
+
+  struct SubtractionTest : TestCase {
+  private:
+    void runTest() override {
+      num++;
+      ASSERT_EQ(0, base - 10);
+    }
+
+  private:
+    int base = 10;
+  };
+}
+
+TEST(TestSuite, run_multi_test_cases_using_test_suite) {
+  TestSuite suite;
+  suite.add(new AdditionTest);
+  suite.add(new SubtractionTest);
+  suite.run();
+
+  ASSERT_EQ(2, num);
+}
+ \end{c++}
+\end{leftbar}
+
+\subsubsection{通过测试}
+
+为了通过测试，就得老老实实地\ascii{TestSuite::run}的逻辑了。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{include/mars/core/TestSuite.h}}]
+#ifndef UUID_18819C28_B404_45A7_BCB9_E2A39A447ECF
+#define UUID_18819C28_B404_45A7_BCB9_E2A39A447ECF
+
+#include <vector>
+
+struct TestCase;
+
+struct TestSuite {
+  void add(TestCase* test);
+  void run();
+
+private:
+  std::vector<TestCase*> tests;
+};
+
+#endif
+ \end{c++}
+\end{leftbar}
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{src/mars/core/TestSuite.cc}}]
+#include "mars/core/TestSuite.h"
+#include "mars/core/TestCase.h"
+
+void TestSuite::add(TestCase* test) {
+  tests.push_back(test);
+}
+
+void TestSuite::run() {
+  for (auto test : tests) {
+    test->run();
+  }
+}
+ \end{c++}
+\end{leftbar}
+
+\subsubsection{内存泄露}
+
+引入析构函数。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{include/mars/core/TestSuite.h}}]
+#ifndef UUID_18819C28_B404_45A7_BCB9_E2A39A447ECF
+#define UUID_18819C28_B404_45A7_BCB9_E2A39A447ECF
+
+#include <vector>
+
+struct TestCase;
+
+struct TestSuite {
+  ~TestSuite();
+
+  void add(TestCase* test);
+  void run();
+
+private:
+  std::vector<TestCase*> tests;
+};
+
+#endif
+ \end{c++}
+\end{leftbar}
+
+实现析构函数，释放动态内存。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{src/mars/core/TestSuite.cc}}]
+#include "mars/core/TestSuite.h"
+#include "mars/core/TestCase.h"
+
+void TestSuite::add(TestCase* test) {
+  tests.push_back(test);
+}
+
+TestSuite::~TestSuite() {
+  for (auto test : tests) {
+    delete test;
+  }
+}
+
+void TestSuite::run() {
+  for (auto test : tests) {
+    test->run();
+  }
+}
+ \end{c++}
+\end{leftbar}
+
+\subsubsection{消除重复}
+
+不要在头文件实现\ascii{foreach}模板函数。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{include/mars/core/TestSuite.h}}]
+#ifndef UUID_18819C28_B404_45A7_BCB9_E2A39A447ECF
+#define UUID_18819C28_B404_45A7_BCB9_E2A39A447ECF
+
+#include <vector>
+
+struct TestCase;
+
+struct TestSuite {
+  ~TestSuite();
+
+  void add(TestCase* test);
+  void run();
+
+private:
+  template <typename F>
+  void foreach(F f);
+
+private:
+  std::vector<TestCase*> tests;
+};
+
+#endif
+ \end{c++}
+\end{leftbar}
+
+使用\ascii{Lambda}定制差异化。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{src/mars/core/TestSuite.cc}}]
+#include "mars/core/TestSuite.h"
+#include "mars/core/TestCase.h"
+
+void TestSuite::add(TestCase* test) {
+  tests.push_back(test);
+}
+
+template <typename F>
+inline void TestSuite::foreach(F f) {
+  for (auto test : tests) {
+    f(test);
+  }
+}
+
+TestSuite::~TestSuite() {
+  foreach([](TestCase* test) {
+    delete test;
+  });
+}
+
+void TestSuite::run() {
+  foreach([](TestCase* test) {
+    test->run();
+  });
+}
+ \end{c++}
+\end{leftbar}
+
+\subsection{嵌套结构}
+
+为了实现更高的可扩展性，\ascii{TestSuite}不仅能打包\ascii{TestCase}实例，也应该能够打包\ascii{TestSuite}实例，实现用例的嵌套结构。
+
+\subsubsection{重置计数器}
+
+每当执行一组用例时，确保\ascii{num}被初始化为\ascii{0}；否则测试用例之间存在数据脏写的错误。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{test/mars/core/TestSuiteSpec.cc}}]
+#include <gtest/gtest.h>
+#include "mars/core/TestCase.h"
+#include "mars/core/TestSuite.h"
+
+namespace {
+  static int num = 0;
+
+  struct AdditionTest : TestCase {
+  private:
+    void runTest() override {
+      num++;
+      ASSERT_EQ(20, base + 10);
+    }
+
+  private:
+    int base = 10;
+  };
+
+  struct SubtractionTest : TestCase {
+  private:
+    void runTest() override {
+      num++;
+      ASSERT_EQ(0, base - 10);
+    }
+
+  private:
+    int base = 10;
+  };
+
+  struct TestSuiteSpec : testing::Test {
+  protected:
+    void run(Test& test) {
+      test.run();
+    }
+  
+  private:
+    void SetUp() override {
+      num = 0;
+    }
+  };
+}
+
+TEST_F(TestSuiteSpec, run_multi_test_cases_using_test_suite) {
+  TestSuite suite;
+  suite.add(new AdditionTest);
+  suite.add(new SubtractionTest);
+
+  run(suite);
+
+  ASSERT_EQ(2, num);
+}
+
+TEST_F(TestSuiteSpec, package_test_suite_into_another_test_suite) {
+  TestSuite *inner = new TestSuite;
+  inner->add(new AdditionTest);
+
+  TestSuite outter;
+  outter.add(new SubtractionTest);
+  outter.add(inner);
+
+  run(outter);
+
+  ASSERT_EQ(2, num);
+}
+ \end{c++}
+\end{leftbar}
+
+\subsubsection{提取抽象}
+
+为了能够兼容\ascii{TestCase}与\ascii{TestSuite}，使得两者之间无差异化。因此，提取两者的共同抽象\ascii{Test}。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{include/mars/core/Test.h}}]
+#ifndef UUID_CBABF60A_A645_46EC_8402_6E559233E074
+#define UUID_CBABF60A_A645_46EC_8402_6E559233E074
+
+struct Test {
+  virtual ~Test() {}
+  virtual void run() = 0;
+};
+
+#endif
+ \end{c++}
+\end{leftbar}
+
+\subsubsection{重构TestCase}
+
+\ascii{TestCase}除了默认的构造函数是\ascii{public}的，其它都是\ascii{private}的。尤其关注被覆写的\ascii{TestCase::run}，显式地声明为\ascii{private}，逼迫用户使用\ascii{Test::run}的抽象接口，而“面向接口编程”是一种良好的\ascii{OO}设计原则。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{include/mars/core/TestCase.h}}]
+#include "mars/core/Test.h"
+
+struct TestCase : Test {
+private:
+  void run() override;
+
+private:
+  virtual void setUp() {}
+  virtual void runTest() {}
+  virtual void tearDown() {}
+};
+ \end{c++}
+\end{leftbar}
+
+\subsubsection{重构TestSuite}
+
+同理，\ascii{TestSuite}应该使用\ascii{Test}的抽象的接口类型进行编程，而非使用具体的\ascii{TestCase}类型。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{include/mars/core/TestSuite.h}}]
+#ifndef UUID_18819C28_B404_45A7_BCB9_E2A39A447ECF
+#define UUID_18819C28_B404_45A7_BCB9_E2A39A447ECF
+
+#include <vector>
+#include "mars/core/Test.h"
+
+struct TestSuite : Test {
+  ~TestSuite();
+
+  void add(Test* test);
+
+private:
+  void run() override;
+
+private:
+  template <typename F>
+  void foreach(F f);
+
+private:
+  std::vector<Test*> tests;
+};
+
+#endif
+ \end{c++}
+\end{leftbar}
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{src/mars/core/TestSuite.cc}}]
+#include "mars/core/TestSuite.h"
+
+void TestSuite::add(Test* test) {
+  tests.push_back(test);
+}
+
+template <typename F>
+inline void TestSuite::foreach(F f) {
+  for (auto test : tests) {
+    f(test);
+  }
+}
+
+TestSuite::~TestSuite() {
+  foreach([](Test* test) {
+    delete test;
+  });
+}
+
+void TestSuite::run() {
+  foreach([](Test* test) {
+    test->run();
+  });
+}
+ \end{c++}
+\end{leftbar}
+
+\end{content}
