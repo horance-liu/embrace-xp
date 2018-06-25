@@ -743,7 +743,9 @@ void TestSuite::run() {
 
 \begin{content}
 
-在之前的测试用例里，在匿名命名空间内引入计数器\ascii{num}。当\ascii{TestCase}被执行时，其\ascii{num++}。显然，这是一种临时的设计方案，用户需要小心地维护计数器的初始化，及其控制累加计数器的时机。这是一种脆弱的设计，一则容易引入不经意的错误，二则让计数器的操作散乱到各个覆写的\ascii{TestCase::runTest}之中。
+在之前的测试用例里，在匿名命名空间内引入计数器\ascii{num}。当\ascii{TestCase}被执行时，其\ascii{num++}。
+
+这是一种脆弱的设计，用户需要小心地维护计数器的初始化，也需要用户精细控制计数器累加的时机。一则容易引入不经意的错误，二则让计数器的操作散乱到各个覆写的\ascii{TestCase::runTest}子类之中。
 
 \subsection{引入TestResult}
 
@@ -794,7 +796,7 @@ TEST_F(TestSuiteSpec, package_test_suite_into_another_test_suite) {
 
 \subsubsection{通过编译}
 
-\ascii{TestResult}维护了一个计数器，负责计数器初始化，累计操作等职责。
+\ascii{TestResult}维护了一个计数器，负责计数器初始化，累计操作数等职责。
 
 \begin{leftbar}
  \begin{c++}[caption={\ttfamily{include/mars/core/TestResult.h}}]
@@ -825,7 +827,7 @@ int TestResult::runCount() const {
 
 \subsubsection{通过测试}
 
-为了通过测试，当执行\ascii{TestCase::run}时，通知\ascii{TestResult}累加计数器。为了使得代码具有层次感，提取了\ascii{TestCase::runBare}的子函数。
+为了通过测试，当执行\ascii{TestCase::run}时，通知\ascii{TestResult}累加计数器。为了使得代码具有层次感，提取了\ascii{TestCase::runBare}的子函数，使得\ascii{TestCase::run}的主干更加清晰明了。
 
 \begin{leftbar}
  \begin{c++}[caption={\ttfamily{src/mars/core/TestCase.cc}}]
