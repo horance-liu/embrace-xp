@@ -88,7 +88,7 @@ mars
 
 \subsubsection{CMakeList实现}
 
-主控的\ascii{CMakeLists.txt}的内容如下：
+主控的\ascii{CMakeLists.txt}内容如下：
 
 \begin{leftbar}
  \begin{c++}[caption={\ttfamily{CMakeLists.txt}}]
@@ -104,7 +104,7 @@ add_subdirectory(test)
  \end{c++}
 \end{leftbar}
 
-\ascii{src\CMakeLists.txt}完成\ascii{mars}库的构建。
+\ascii{src/CMakeLists.txt}完成\ascii{mars}库的构建。
 
 \begin{leftbar}
  \begin{c++}[caption={\ttfamily{src/CMakeLists.txt}}]
@@ -113,7 +113,7 @@ add_library(mars STATIC ${all_files})
  \end{c++}
 \end{leftbar}
 
-\ascii{test\CMakeLists.txt}完成\ascii{mars-test}应用程序的构建，执行\ascii{mars}的测试用例。
+\ascii{test/CMakeLists.txt}完成\ascii{mars-test}应用程序的构建，执行\ascii{mars}的测试用例。
 
 \begin{leftbar}
  \begin{c++}[caption={\ttfamily{test/CMakeLists.txt}}]
@@ -273,7 +273,7 @@ TEST(SimpleTest, make_sure_test_case_can_run_normally) {
 
 \subsubsection{通过编译}
 
-重构\ascii{TestCase}，仅公开\ascii{run}方法，并移除运行时多态的特性，它负责用例执行的运行时的算法骨架。转移运行时多态行为至私有的两个虚函数，用户可以根据自己的场景定制\ascii{setUp}与\ascii{runTest}，分别完成用例的初始化，及其测试执行。
+重构\ascii{TestCase}，仅公开\ascii{run}方法，并移除运行时多态的特性，它负责用例执行的运行时的算法骨架。搬迁运行时多态行为至私有的两个虚函数，用户可以根据自己的场景定制\ascii{setUp}与\ascii{runTest}，分别完成用例的初始化，及其测试执行。
 
 \begin{leftbar}
  \begin{c++}[caption={\ttfamily{include/mars/core/TestCase.h}}]
@@ -379,6 +379,8 @@ private:
 
 \subsubsection{通过测试}
 
+测试通过，提交\ascii{Git}库。至此，完成了运行一个用例的主体逻辑，但缺乏异常处理机制，留待还需处理。
+
 \begin{leftbar}
  \begin{c++}[caption={\ttfamily{src/mars/core/TestCase.cc}}]
 #include "mars/core/TestCase.h"
@@ -391,7 +393,7 @@ void TestCase::run() {
  \end{c++}
 \end{leftbar}
 
-测试通过，提交\ascii{Git}库。
+
 
 \end{content}
 
@@ -477,7 +479,7 @@ void TestSuite::run() {
 
 \subsubsection{内存泄露}
 
-引入析构函数。
+\ascii{TestSuite}管理了若干\ascii{TestCase}的实例，引入析构函数释放动态创建并添加至\ascii{TestSuite}的所有\ascii{TestCase}实例。
 
 \begin{leftbar}
  \begin{c++}[caption={\ttfamily{include/mars/core/TestSuite.h}}]
@@ -548,14 +550,14 @@ private:
  \end{c++}
 \end{leftbar}
 
-因此，设计得到两个独立变化的方向，使得它们可以独立的变化。
+因此，设计得到两个独立变化的方向。
 
 \begin{enum}
-  \eitem{\ascii{迭代算法：因存储结构变化而变化，目前实现为线性列表，不排除将来实现为map；}}
-  \eitem{\ascii{处理算子：删除，计数，运行。}}
+  \eitem{\ascii{迭代算法：因存储结构变化而变化(目前实现为线性列表，不排除将来实现为map)；}}
+  \eitem{\ascii{处理算子：存在删除，计数，运行等操作。}}
 \end{enum}
 
-这里，使用\ascii{Lambda}定制处理算子的差异化。
+可以使用\ascii{Lambda}表达式定制各种算子，实现差异化配置，实现对迭代算法的高度复用。
 
 \begin{leftbar}
  \begin{c++}[caption={\ttfamily{src/mars/core/TestSuite.cc}}]
@@ -574,13 +576,13 @@ inline void TestSuite::foreach(F f) const {
 }
 
 TestSuite::~TestSuite() {
-  foreach([](TestCase* test) {
+  foreach([](auto test) {
     delete test;
   });
 }
 
 void TestSuite::run() {
-  foreach([](TestCase* test) {
+  foreach([](auto test) {
     test->run();
   });
 }
@@ -589,9 +591,9 @@ void TestSuite::run() {
 
 \subsection{嵌套结构}
 
-为了实现更好的可扩展性，\ascii{TestSuite}不仅能打包\ascii{TestCase}实例，也应该能够打包\ascii{TestSuite}实例，实现用例的嵌套结构。
+为了实现更好的可扩展性，\ascii{TestSuite}不仅能打包\ascii{TestCase}实例，也应该能够打包\ascii{TestSuite}实例，实现隐式的树结构。
 
-当执行用例时，确保\ascii{num}被初始化为\ascii{0}；否则测试用例之间存在数据脏写的错误。另外，没有直接调用\ascii{TestSuite::run}，而是使用更为抽象的\ascii{Test::run}，测试装置将更加稳定。
+为了能够添加更多的用例，需要对计数器\ascii{num}实施初始化。当执行用例时，确保\ascii{num}被初始化为\ascii{0}；否则测试用例之间存在数据脏写的错误依赖。另外，此处没有直接调用\ascii{TestSuite::run}，而是使用更为抽象的\ascii{Test::run}，测试装置将更加稳定。
 
 \begin{leftbar}
  \begin{c++}[caption={\ttfamily{test/mars/core/TestSuiteSpec.cc}}]
@@ -612,7 +614,7 @@ namespace {
   struct TestSuiteSpec : testing::Test {
   private:
     void SetUp() override {
-      num = 0;
+      num = 0;  // init!!!
     }
 
   protected:
@@ -682,7 +684,7 @@ private:
 
 \subsubsection{重构TestSuite}
 
-同理，\ascii{TestSuite}应该被重构使用\ascii{Test}的抽象类型，而非使用\ascii{TestCase}的具体类型。
+同理，\ascii{TestSuite}也应该被重构使用\ascii{Test}的抽象类型，而非使用\ascii{TestCase}的具体类型。
 
 \begin{leftbar}
  \begin{c++}[caption={\ttfamily{include/mars/core/TestSuite.h}}]
@@ -706,7 +708,7 @@ private:
  \end{c++}
 \end{leftbar}
 
-同理，实现也应该使用\ascii{Test}的抽象类型。
+同理，实现也应该使用\ascii{Test}的抽象类型。因为使用\ascii{auto}，实现文件只用修改\ascii{add}的签名即可。
 
 \begin{leftbar}
  \begin{c++}[caption={\ttfamily{src/mars/core/TestSuite.cc}}]
@@ -724,13 +726,13 @@ inline void TestSuite::foreach(F f) const {
 }
 
 TestSuite::~TestSuite() {
-  foreach([](Test* test) {
+  foreach([](auto test) {
     delete test;
   });
 }
 
 void TestSuite::run() {
-  foreach([](Test* test) {
+  foreach([](auto test) {
     test->run();
   });
 }
@@ -749,7 +751,7 @@ void TestSuite::run() {
 
 \subsection{引入TestResult}
 
-为了消除这个不稳定的设计，这里引入\ascii{TestResult}的抽象，将计数器维护的职责剥离出来，\ascii{TestResult}扮演了聚集参数的角色。
+为了消除这个不稳定的设计，这里引入\ascii{TestResult}的抽象，将计数器维护的职责剥离出来。其中，\ascii{TestResult}扮演了聚集参数的角色。
 
 \begin{leftbar}
  \begin{c++}[caption={\ttfamily{test/mars/core/TestSuiteSpec.cc}}]
@@ -797,6 +799,7 @@ TEST_F(TestSuiteSpec, package_test_suite_into_another_test_suite) {
 \subsubsection{通过编译}
 
 \ascii{TestResult}维护了一个计数器，负责计数器初始化，累计操作数等职责。
+g
 
 \begin{leftbar}
  \begin{c++}[caption={\ttfamily{include/mars/core/TestResult.h}}]
@@ -861,3 +864,549 @@ void TestResult::run() {
 
 \end{content}
 
+\section{异常处理}
+
+\begin{content}
+
+至此，框架不能处理任何异常逻辑。当用户调用\ascii{ASSERT\_EQ}失败时，抛出\ascii{AssertionError}异常，框架捕获该异常，标记该测试执行为\ascii{Failure}；如果抛出其他异常，则标记该测试执行为\ascii{Error}。区分这两种异常类型，使得用户可以审查自己的测试用例，并修复失败的用例。
+
+\subsection{断言失败}
+
+当用例的断言失败，打印诸如如下信息，提示用户修复失败的用例。
+
+\begin{leftbar}
+ \begin{python}[caption={测试失败}]
+/home/horance/code/cpp/mars/test/mars/core/TestCaseSpec.cc:33
+expected value == 2, but got 0
+ \end{python}
+\end{leftbar}
+
+接下来，构建失败的用例，在\ascii{runTest}时抛出异常\ascii{AssertionError}，模拟断言失败的场景。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{test/mars/TestCaseSpec.cc}}]
+#include "mars/except/AssertionError.h"
+
+namespace {
+  struct AssertionFailedTest : TestCase {
+    void runTest() override {
+      throw AssertionError("test.cpp:57", "expected value == 2, but got 3");
+    }
+  };
+}
+
+TEST_F(TestCaseSpec, throw_assertion_error_on_run_test) {
+  AssertionFailedTest test;
+  run(test);
+
+  ASSERT_EQ(1, result.failCount());
+}
+ \end{c++}
+\end{leftbar}
+
+\subsubsection{异常类}
+
+为了通过编译，引入\ascii{AssertionError}的异常类。它携带了断言失败处的文件名与行号，及其用例断言失败的具体原因。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{include/mars/except/AssertionError.h}}]
+struct AssertionError : std::exception {
+  AssertionError(const std::string& src, const std::string& msg);
+  ~AssertionError() noexcept = default;
+
+  const char* what() const noexcept;
+
+private:
+  std::string msg;
+};
+ \end{c++}
+\end{leftbar}
+
+\ascii{AssertionError}实现如下。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{src/mars/except/AssertionError.cc}}]
+#include "mars/except/AssertionError.h"
+
+AssertionError::AssertionError(const std::string& src,
+  const std::string& msg) : msg(src + "\n" + msg) {
+}
+
+const char* AssertionError::what() const noexcept {
+  return msg.c_str();
+}
+ \end{c++}
+\end{leftbar}
+
+\subsubsection{通过编译}
+
+\ascii{TestResult}维护了一个计数器，负责计数器初始化，累计操作数等职责。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{include/mars/core/TestResult.h}}]
+struct TestResult {
+  TestResult();
+
+  void run();
+  void fail();
+
+  int runCount() const;
+  int failCount() const;
+
+private:
+  int numOfRuns;
+  int numOfFails;
+};
+ \end{c++}
+\end{leftbar}
+
+\subsubsection{通过链接}
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{src/mars/core/TestResult.cc}}]
+#include "mars/core/TestResult.h"
+
+TestResult::TestResult() : numOfRuns(0), numOfFails(0) {
+}
+
+int TestResult::runCount() const {
+  return numOfRuns;
+}
+
+int TestResult::failCount() const {
+  return numOfFails;
+}
+
+void TestResult::run() {
+  numOfRuns++;
+}
+
+void TestResult::fail() {
+  numOfFails++;
+}
+ \end{c++}
+\end{leftbar}
+
+\subsubsection{通过测试}
+
+为了通过测试，当执行\ascii{TestCase::run}时，捕获异常并通知\ascii{TestResult}累加计数器。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{src/mars/core/TestCase.cc}}]
+#include "mars/core/TestCase.h"
+#include "mars/core/TestResult.h"
+
+void TestCase::runBare(TestResult& result) {
+  setUp();
+
+  try {
+    runTest();
+  } catch (const AssertionError&) {
+    result.fail();
+  }
+
+  tearDown();
+}
+
+void TestCase::run(TestResult& result) {
+  result.run();
+  runBare(result);
+}
+ \end{c++}
+\end{leftbar}
+
+至此，测试通过。
+
+\subsection{前置失败}
+
+\ascii{TestCase}执行时，还未执行至\ascii{runTest}时，执行\ascii{setUp}就失败了。构建失败的用例，模拟前置失败的场景。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{test/mars/TestCaseSpec.cc}}]
+namespace {
+  struct AssertionFailedOnSetUpTest : TestCase {
+    bool wasRun = false;
+
+    void setUp() override {
+      throw AssertionError("test.cpp:57", "expected value == 2, but got 3");
+    }
+
+    void runTest() override {
+      wasRun = true;
+    }
+  };
+}
+
+TEST_F(TestCaseSpec, throw_assertion_error_on_setup) {
+  AssertionFailedOnSetUpTest test;
+  run(test);
+
+  ASSERT_FALSE(test.wasRun);
+  ASSERT_EQ(1, result.failCount());
+}
+ \end{c++}
+\end{leftbar}
+
+\subsubsection{通过测试}
+
+为了通过测试，当执行\ascii{TestCase::setUp}时，捕获异常并通知\ascii{TestResult}累加计数器，并立即终止该用例的执行；毕竟环境没准备好，强制执行用例毫无意义。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{src/mars/core/TestCase.cc}}]
+#include "mars/core/TestCase.h"
+#include "mars/core/TestResult.h"
+
+void TestCase::runBare(TestResult& result) {
+  try {
+    setUp();
+  } catch (const AssertionError&) {
+    result.fail();
+    return;
+  }
+
+  try {
+    runTest();
+  } catch (const AssertionError&) {
+    result.fail();
+  }
+
+  tearDown();
+}
+
+void TestCase::run(TestResult& result) {
+  result.run();
+  runBare(result);
+}
+ \end{c++}
+\end{leftbar}
+
+至此，测试通过。
+
+\subsection{后置失败}
+
+\ascii{TestCase}执行时，执行完\ascii{runTest}时，接着执行\ascii{tearDown}时失败了。构建失败的用例，模拟后置失败的场景。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{test/mars/TestCaseSpec.cc}}]
+namespace {
+  struct AssertionFailedOnTearDownTest : TestCase {
+    void tearDown() override {
+      throw AssertionError("test.cpp:57", "expected value == 2, but got 3");
+    }
+  };
+}
+
+TEST_F(TestCaseSpec, throw_assertion_error_on_tear_down) {
+  AssertionFailedOnTearDownTest test;
+  run(test);
+
+  ASSERT_EQ(1, result.failCount());
+}
+ \end{c++}
+\end{leftbar}
+
+\subsubsection{通过测试}
+
+为了通过测试，当执行\ascii{TestCase::tearDown}时，捕获异常并通知\ascii{TestResult}累加计数器。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{src/mars/core/TestCase.cc}}]
+#include "mars/core/TestCase.h"
+#include "mars/core/TestResult.h"
+
+void TestCase::runBare(TestResult& result) {
+  try {
+    setUp();
+  } catch (const AssertionError&) {
+    result.fail();
+    return;
+  }
+
+  try {
+    runTest();
+  } catch (const AssertionError&) {
+    result.fail();
+  }
+
+  try {
+    tearDown();
+  } catch (const AssertionError&) {
+    result.fail();
+  }
+}
+
+void TestCase::run(TestResult& result) {
+  result.run();
+  runBare(result);
+}
+ \end{c++}
+\end{leftbar}
+
+至此，测试通过。
+
+\subsection{异常与错误}
+
+当抛出\ascii{AssertionError}，称之为\ascii{failure}；当抛出其他异常，诚挚为\ascii{Error}。构建失败的用例，模拟其他异常抛出的场景。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{test/mars/TestCaseSpec.cc}}]
+namespace {
+  struct StdExceptionTest : TestCase {
+    void runTest() override {
+      throw std::exception();
+    }
+  };
+}
+
+TEST_F(TestCaseSpec, throw_std_exception_on_run_test) {
+  StdExceptionTest test;
+  run(test);
+
+  ASSERT_EQ(0, result.failCount());
+  ASSERT_EQ(1, result.errorCount());
+}
+ \end{c++}
+\end{leftbar}
+
+\subsubsection{捕获异常}
+
+当执行\ascii{TestCase::runTest}时，捕获\ascii{std::exception}异常，并通知\ascii{TestResult::error}累加计数器。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{src/mars/core/TestCase.cc}}]
+#include "mars/core/TestCase.h"
+#include "mars/core/TestResult.h"
+
+void TestCase::runBare(TestResult& result) {
+  try {
+    setUp();
+  } catch (const AssertionError&) {
+    result.fail();
+    return;
+  }
+
+  try {
+    runTest();
+  } catch (const AssertionError&) {
+    result.fail();
+  } catch (const std::exception&) {
+    result.error();
+  }
+
+  try {
+    tearDown();
+  } catch (const AssertionError&) {
+    result.fail();
+  }
+}
+
+void TestCase::run(TestResult& result) {
+  result.run();
+  runBare(result);
+}
+ \end{c++}
+\end{leftbar}
+
+\subsubsection{错误计数器}
+
+增加\ascii{TestResult::errorCount}的成员函数，及其相应的计数器。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{include/mars/core/TestResult.h}}]
+struct TestResult {
+  TestResult();
+
+  void run();
+  void fail();
+
+  int runCount() const;
+  int failCount() const;
+  int errorCount() const;
+
+private:
+  int numOfRuns;
+  int numOfFails;
+  int numOfErrors;
+};
+ \end{c++}
+\end{leftbar}
+
+\subsubsection{通过链接}
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{src/mars/core/TestResult.cc}}]
+#include "mars/core/TestResult.h"
+
+TestResult::TestResult()
+  : numOfRuns(0), numOfFails(0)， numOfErrors(0) {
+}
+
+int TestResult::runCount() const {
+  return numOfRuns;
+}
+
+int TestResult::failCount() const {
+  return numOfFails;
+}
+
+int TestResult::failCount() const {
+  return numOfErrors;
+}
+
+void TestResult::run() {
+  numOfRuns++;
+}
+
+void TestResult::fail() {
+  numOfFails++;
+}
+
+void TestResult::error() {
+  numOfErrors++;
+}
+ \end{c++}
+\end{leftbar}
+
+至此，测试通过。
+
+\subsection{未知错误}
+
+当抛出非\ascii{std::exception}，称之为未知的错误。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{test/mars/TestCaseSpec.cc}}]
+namespace {
+  struct UnknownExceptionTest : TestCase {
+    void runTest() override {
+      throw std::out_of_range("overflow");
+    }
+  };
+}
+
+TEST_F(TestCaseSpec, throw_unknown_exception_on_run_test) {
+  UnknownExceptionTest test;
+  run(test);
+
+  ASSERT_EQ(0, result.failCount());
+  ASSERT_EQ(1, result.errorCount());
+}
+ \end{c++}
+\end{leftbar}
+
+\subsubsection{捕获异常}
+
+当执行\ascii{TestCase::runTest}时，捕获未知的异常，并通知\ascii{TestResult::error}累加计数器。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{src/mars/core/TestCase.cc}}]
+#include "mars/core/TestCase.h"
+#include "mars/core/TestResult.h"
+
+void TestCase::runBare(TestResult& result) {
+  try {
+    setUp();
+  } catch (const AssertionError&) {
+    result.fail();
+    return;
+  }
+
+  try {
+    runTest();
+  } catch (const AssertionError&) {
+    result.fail();
+  } catch (const std::exception&) {
+    result.error();
+  } catch (...) {
+    result.error();
+  }
+
+  try {
+    tearDown();
+  } catch (const AssertionError&) {
+    result.fail();
+  }
+}
+
+void TestCase::run(TestResult& result) {
+  result.run();
+  runBare(result);
+}
+ \end{c++}
+\end{leftbar}
+
+测试通过。
+
+\subsection{完备的异常处理}
+
+依次构建测试用例，小步快走，驱动出完备的异常处理逻辑。但是，异常臃肿，异常难堪；在开启重构之前，还需要得到更多关于异常的信息，并通知给\ascii{TestResult}。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{src/mars/core/TestCase.cc}}]
+#include "mars/core/TestCase.h"
+#include "mars/core/TestResult.h"
+
+void TestCase::runBare(TestResult& result) {
+  try {
+    setUp();
+  } catch (const AssertionError&) {
+    result.fail();
+    return;
+  } catch (const std::exception&) {
+    result.error();
+    return;
+  } catch (...) {
+    result.error();
+    return;
+  }
+
+  try {
+    runTest();
+  } catch (const AssertionError&) {
+    result.fail();
+  } catch (const std::exception&) {
+    result.error();
+  } catch (...) {
+    result.error();
+  }
+
+  try {
+    tearDown();
+  } catch (const AssertionError&) {
+    result.fail();
+  } catch (const std::exception&) {
+    result.error();
+  } catch (...) {
+    result.error();
+  }
+}
+
+void TestCase::run(TestResult& result) {
+  result.run();
+  runBare(result);
+}
+ \end{c++}
+\end{leftbar}
+
+\subsection{传递异常}
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{test/mars/TestCaseSpec.cc}}]
+namespace {
+  struct AssertionFailedTest : TestCase {
+    void runTest() override {
+      throw AssertionError("test.cpp:57", "expected value == 2, but got 3");
+    }
+  };
+}
+
+TEST_F(TestCaseSpec, throw_assertion_error_on_run_test) {
+  AssertionFailedTest test;
+  run(test);
+
+  ASSERT_EQ(1, result.);
+  ASSERT_EQ(0, result.errorCount());
+}
+ \end{c++}
+\end{leftbar}
+
+\end{content}
