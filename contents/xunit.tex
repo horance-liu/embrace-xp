@@ -37,14 +37,26 @@ FIXTURE(StackSpec) {
 
   SETUP {
     v.push(1);
+    v.push(2);
   }
 
-  TEST("top element") {
+  TEST("apply pop: 0 time") {
+    ASSERT_EQ(2, v.top());
+  }
+
+  TEST("apply pop: 1 time") {
+    v.pop();
     ASSERT_EQ(1, v.top());
+  }
+
+  TEST("apply pop: 2 times") {
+    v.pop();
+    v.pop()
+    ASSERT_TRUE(v.empty());
   }
  
   TEARDOWN {
-    v.pop();
+    v.clear();
   }
 }; 
  \end{c++}
@@ -134,7 +146,7 @@ $ git commit -m"setup project"
 
 \subsection{起航}
 
-万事开头难，第一个用例跑起来并不容易，此处设计实现了一个最简单的测试用例。当用户新增一个用例时，框架需要具有良好的扩展性，需要很方便地支持用户的测试用例的设计。在面向对象设计中，通常通过扩展子类实现开放封闭的设计原则。
+万事开头难，第一个用例跑起来并不容易。此处设计实现了一个简单的测试用例，用户通过扩展框架的\ascii{TestCase}，实现测试用例的新增。一般地，在面向对象设计中，通常通过扩展子类实现是实现开放封闭原则的重要手段。
 
 \begin{leftbar}
  \begin{c++}[caption={\ttfamily{test/mars/core/TestCaseSpec.cc}}]
@@ -836,7 +848,7 @@ const std::string& TestCase::getName() const {
  \end{c++}
 \end{leftbar}
 
-此时，\ascii{TestSuite}不能满足编译条件。依葫芦画瓢，\ascii{TestSuite}的名字实现与\ascii{TestCase}雷同。
+依葫芦画瓢，\ascii{TestSuite}的名字实现与\ascii{TestCase}雷同。
 
 \begin{leftbar}
  \begin{c++}[caption={\ttfamily{include/mars/core/TestSuite.h}}]
@@ -874,6 +886,8 @@ TestSuite::TestSuite(const std::string& name) : name(name) {
 const std::string& TestSuite::getName() const {
   return name;
 }
+
+// ...
  \end{c++}
 \end{leftbar}
 
@@ -881,13 +895,13 @@ const std::string& TestSuite::getName() const {
 
 \subsubsection{消除重复}
 
-显然，\ascii{TestCase}与\ascii{TestSuite}的两个构造函数，及其覆写\ascii{Test::getName}，都产生了明显的重复设计。为了消除重复，可以将公共代码搬迁至父类。
+但是，\ascii{TestCase}与\ascii{TestSuite}存在结构性重复设计，包括相同的构造函数，覆写\ascii{getName}成员函数，私有字段\ascii{name}。为了消除重复，重构将公共实现搬迁至父类。
 
-需要关注两点：
+搬迁至父类需要关注两点：
 
 \begin{enum}
-  \eitem{\ascii{Test}的构造函数被声明为\ascii{public}，方便子类使用\ascii{using}语句直接复用；}
-  \eitem{\ascii{getName}没有必要声明为纯虚函数了，在\ascii{Test}内已经完全具备实现的条件。}
+  \eitem{\ascii{Test}的构造函数被声明为\ascii{public}，方便子类使用\ascii{using}语句直接复用构造函数。}
+  \eitem{\ascii{getName}没有必要声明为虚函数，因为在\ascii{Test}内已经完全具备实现的条件；子类强制继承\ascii{getName}的实现，拒绝被覆写。}
 \end{enum}
 
 \begin{leftbar}
@@ -907,7 +921,7 @@ private:
  \end{c++}
 \end{leftbar}
 
-在\ascii{TestCase}中复用该构造函数，可以直接使用\ascii{using}语句。
+在\ascii{TestCase}中，直接使用\ascii{using}语句复用构造函数。
 
 \begin{leftbar}
  \begin{c++}[caption={\ttfamily{include/mars/core/TestCase.h}}]
@@ -954,7 +968,7 @@ private:
  \end{c++}
 \end{leftbar}
 
-遗憾的是，\ascii{Test}构造函数未能声明为\ascii{protected}，期待\ascii{C++}未来版本修正这个设计缺陷。但是，上述设计并未丢失任何的编译时安全检查。因为\ascii{Test::run}被声明为纯虚函数，在编译时保证用户无法直接创建\ascii{Test}实例，这符合预期设计的期望。
+遗憾的是，\ascii{Test}构造函数未能声明为\ascii{protected}。但是，即使\ascii{Test}的构造函数虽然被声明为\ascii{public}，设计并未丢失编译时的安全检查。因为\ascii{Test::run}被声明为纯虚函数，在编译时保证用户无法直接创建\ascii{Test}实例。
 
 \end{content}
 
@@ -968,7 +982,7 @@ private:
 
 \subsection{引入TestResult}
 
-为了消除这个不稳定的设计，这里引入\ascii{TestResult}的抽象，它专门负责计数器维护，及其测试结果收集等职责。\footnote{可能会导致上帝类，但没有看到坏味道之前，姑且就这么干。即使真的产生了坏味道，再应用重构也不会为时过晚。}设计一个失败的用例，对外暴露\ascii{TestResult::runCount}查询接口。
+为了消除这个不稳定的设计，这里引入\ascii{TestResult}的抽象，它专门负责计数器维护，及其测试结果收集等职责。重构测试用例，对外暴露\ascii{TestResult::runCount}的查询接口。
 
 \begin{leftbar}
  \begin{c++}[caption={\ttfamily{test/mars/core/TestSuiteSpec.cc}}]
@@ -1000,7 +1014,7 @@ TEST_F(TestSuiteSpec, run_multi_test_cases_using_test_suite) {
  \end{c++}
 \end{leftbar}
 
-\subsubsection{通过编译}
+\subsubsection{实现TestResult}
 
 \ascii{TestResult}维护了一个计数器，负责计数器初始化，累计操作数的职责。
 
@@ -1008,6 +1022,8 @@ TEST_F(TestSuiteSpec, run_multi_test_cases_using_test_suite) {
  \begin{c++}[caption={\ttfamily{include/mars/core/TestResult.h}}]
 struct TestResult {
   TestResult();
+
+  void onRun();
   int runCount() const;
 
 private:
@@ -1025,13 +1041,17 @@ private:
 TestResult::TestResult() : numOfRuns(0) {
 }
 
+void TestResult::onRun() {
+  runTests++;
+}
+
 int TestResult::runCount() const {
   return numOfRuns;
 }
  \end{c++}
 \end{leftbar}
 
-\subsubsection{通过测试}
+\subsubsection{重构TestCase}
 
 当执行\ascii{TestCase::run}时，通知\ascii{TestResult}累加计数器。为了使得代码具有层次感，提取了\ascii{TestCase::runBare}的子函数，使得\ascii{TestCase::run}的主干更加清晰明了。
 
@@ -1049,16 +1069,6 @@ void TestCase::runBare() {
 void TestCase::run(TestResult& result) {
   result.onRun();
   runBare();
-}
- \end{c++}
-\end{leftbar}
-
-\ascii{TestResult::onRun}则实现简单的计数器累加操作。
-
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{src/mars/core/TestResult.cc}}]
-void TestResult::onRun() {
-  runTests++;
 }
  \end{c++}
 \end{leftbar}
@@ -1112,7 +1122,7 @@ TEST_F(TestSuiteSpec, run_multi_test_cases_using_test_suite) {
 
 \subsubsection{通过编译}
 
-\ascii{TestResult}维护了一个计数器，负责计数器初始化，累计操作数的职责。
+增加\ascii{Test::countTestCases}纯虚接口。
 
 \begin{leftbar}
  \begin{c++}[caption={\ttfamily{include/mars/core/Test.h}}]
@@ -1143,7 +1153,7 @@ int TestCase::countTestCases() const {
  \end{c++}
 \end{leftbar}
 
-\ascii{TestSuite::countTestCases}覆写行为类似于\ascii{reduce}操作。
+\ascii{TestSuite::countTestCases}覆写行为完成\ascii{reduce}操作。
 
 \begin{leftbar}
  \begin{c++}[caption={\ttfamily{src/mars/core/TestSuite.cc}}]
@@ -1157,7 +1167,7 @@ int TestSuite::countTestCases() const {
  \end{c++}
 \end{leftbar}
 
-至此，测试通过。
+至此，测试通过。相对于\ascii{TestResult::runCount}通过聚集参数实现用例数目的统计，\ascii{TestResult::countTestCases}更加具有可扩展性；并且，\ascii{TestResult}与\ascii{TestCase}的耦合程度更小。
 
 \end{content}
 
@@ -1622,7 +1632,7 @@ void TestCase::run(TestResult& result) {
   } catch (const std::exception&) {
     result.onError();
   } catch (...) {
-    result.error();
+    result.onError();
   }
 
   if (succ) {
@@ -1631,26 +1641,21 @@ void TestCase::run(TestResult& result) {
     } catch (const AssertionError&) {
       result.onFail();
     } catch (const std::exception&) {
-      result.error();
+      result.onError();
     } catch (...) {
-      result.error();
+      result.onError();
     }
   }
 
   try {
     tearDown();
   } catch (const AssertionError&) {
-    result.fail();
+    result.onFail();
   } catch (const std::exception&) {
-    result.error();
+    result.onError();
   } catch (...) {
-    result.error();
+    result.onError();
   }
-}
-
-void TestCase::run(TestResult& result) {
-  result.run();
-  runBare(result);
 }
  \end{c++}
 \end{leftbar}
