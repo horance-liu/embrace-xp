@@ -22,15 +22,15 @@
 
 \begin{enum}
   \eitem{\ascii{在同一个类域内，使得TEST与SETUP/TEARDOWN关系更加紧密；}}
-  \eitem{\ascii{使用字符串描述用例；}}
-  \eitem{\ascii{避免setUp, SetUp, setup大小写混用导致的错误。}}
+  \eitem{\ascii{使用字符串描述用例，改善用例的表达力；}}
+  \eitem{\ascii{避免setup/setUp/SetUp大小写混用而引发错误。}}
 \end{enum}
 
 
 \begin{leftbar}
  \begin{c++}
-#include <statck>
 #include "mars/mars.h"
+#include <stack>
 
 FIXTURE(StackSpec) {
   std::stack<int> v;   
@@ -51,12 +51,8 @@ FIXTURE(StackSpec) {
 
   TEST("apply pop: 2 times") {
     v.pop();
-    v.pop()
+    v.pop();
     ASSERT_TRUE(v.empty());
-  }
- 
-  TEARDOWN {
-    v.clear();
   }
 }; 
  \end{c++}
@@ -146,7 +142,7 @@ $ git commit -m"setup project"
 
 \subsection{起航}
 
-万事开头难，第一个用例跑起来并不容易。此处设计实现了一个简单的测试用例，用户通过扩展框架的\ascii{TestCase}，实现测试用例的新增。一般地，在面向对象设计中，通常通过扩展子类实现是实现开放封闭原则的重要手段。
+万事开头难，第一个用例跑起来并不容易。此处设计实现了一个简单的测试用例，用户通过扩展框架的\ascii{TestCase}，实现测试用例的新增。一般地，在面向对象设计中，通常通过扩展子类是实现开放封闭原则的重要手段。
 
 \begin{leftbar}
  \begin{c++}[caption={\ttfamily{test/mars/core/TestCaseSpec.cc}}]
@@ -226,7 +222,7 @@ Running main() from gtest_main.cc
 [----------] 1 test from SimpleTest (0 ms total)
 
 [----------] Global test environment tear-down
-[==========] 1 test from 1 test case ran. (1 ms total)
+[==========] 1 test from 1 test case ran. (0 ms total)
 [  PASSED  ] 1 test.
  \end{c++}
 \end{leftbar}
@@ -285,7 +281,7 @@ TEST(SimpleTest, make_sure_test_case_can_run_normally) {
 
 \subsubsection{通过编译}
 
-重构\ascii{TestCase}，仅公开\ascii{run}方法，并移除运行时多态的特性，它负责用例执行的运行时的算法骨架。搬迁运行时多态行为至私有的两个虚函数，用户根据自己的场景定制\ascii{setUp}与\ascii{runTest}，分别完成测试准备，及其测试执行。
+重构\ascii{TestCase}，仅公开\ascii{run}方法，并移除运行时多态的特性，它负责组织用例执行运行时的算法骨架。搬迁运行时多态行为至私有的两个虚函数，用户根据自己的场景定制\ascii{setUp}与\ascii{runTest}，分别完成测试准备，及其测试执行。
 
 \begin{leftbar}
  \begin{c++}[caption={\ttfamily{include/mars/core/TestCase.h}}]
@@ -313,7 +309,6 @@ void TestCase::run() {
   setUp();
   runTest();
 }
-
  \end{c++}
 \end{leftbar}
 
@@ -760,7 +755,7 @@ void TestSuite::run() {
  \end{c++}
 \end{leftbar}
 
-通过\ascii{Test, TestCase, TestSuite}，可以方便地组合复杂树形结构的用例图。
+通过\ascii{Test, TestCase, TestSuite}拼装组合，可以方便地构建复杂树形结构的用例图。
 
 \begin{figure}[H]
 \centering
@@ -774,7 +769,7 @@ void TestSuite::run() {
 可以给每个\ascii{TestCase, TestSuite}命名，方便后期用例的定位与调试。
 
 \begin{leftbar}
- \begin{c++}[caption={\ttfamily{test/mars/core/TestSuiteSpec.cc}}]
+ \begin{c++}[caption={\ttfamily{test/mars/core/TestCaseSpec.cc}}]
 #include <gtest/gtest.h>
 #include "mars/core/TestCase.h"
 
@@ -798,13 +793,10 @@ TEST(NamedTestCase, named_test_case) {
  \begin{c++}[caption={\ttfamily{include/mars/core/Test.h}}]
 #include <string>
 
-struct TestResult;
-
 struct Test {
   virtual ~Test() {}
-
   virtual const std::string& getName() const = 0;
-  virtual void run(TestResult&) = 0;
+  virtual void run() = 0;
 };
  \end{c++}
 \end{leftbar}
@@ -816,10 +808,10 @@ struct Test {
 #include "mars/core/Test.h"
 
 struct TestCase : Test {
-  explicit TestCase(const std::string& == "");
+  explicit TestCase(const std::string& = "");
 
 private:
-  const std::string& getName() override;
+  const std::string& getName() const override;
   void run() override;
 
 private:
@@ -845,6 +837,8 @@ TestCase::TestCase(const std::string& name) : name(name) {
 const std::string& TestCase::getName() const {
   return name;
 }
+
+// ...
  \end{c++}
 \end{leftbar}
 
@@ -910,9 +904,9 @@ const std::string& TestSuite::getName() const {
 
 struct Test {
   explicit Test(const std::string& name = "");
-  virtual ~Test() {}
-
   const std::string& getName() const;
+
+  virtual ~Test() {}
   virtual void run() = 0;
 
 private:
@@ -921,7 +915,22 @@ private:
  \end{c++}
 \end{leftbar}
 
-在\ascii{TestCase}中，直接使用\ascii{using}语句复用构造函数。
+\ascii{Test::getName}实现异常简单。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{src/mars/core/Test.cc}}]
+#include "mars/core/Test.h"
+
+Test::Test(const std::string& name) : name(name) {
+}
+
+const std::string& Test::getName() const {
+  return name;
+}
+ \end{c++}
+\end{leftbar}
+
+在\ascii{TestCase}中，直接使用\ascii{using}语句复用构造函数，删除既有的\ascii{TestCase::getName}实现，及其私有字段\ascii{std::string name}。
 
 \begin{leftbar}
  \begin{c++}[caption={\ttfamily{include/mars/core/TestCase.h}}]
@@ -1042,7 +1051,7 @@ TestResult::TestResult() : numOfRuns(0) {
 }
 
 void TestResult::onRun() {
-  runTests++;
+  numOfRuns++;
 }
 
 int TestResult::runCount() const {
@@ -1054,6 +1063,31 @@ int TestResult::runCount() const {
 \subsubsection{重构TestCase}
 
 当执行\ascii{TestCase::run}时，通知\ascii{TestResult}累加计数器。为了使得代码具有层次感，提取了\ascii{TestCase::runBare}的子函数，使得\ascii{TestCase::run}的主干更加清晰明了。
+
+在头文件中，提取的\ascii{TestCase::runBare}的子函数声明为\ascii{private}。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{include/mars/core/TestCase.h}}]
+#include "mars/core/Test.h"
+
+struct TestCase : Test {
+  using Test::Test;
+
+private:
+  void run(TestResult&) override;
+
+private:
+  virtual void setUp() {}
+  virtual void runTest() {}
+  virtual void tearDown() {}
+
+private:
+  void runBare();
+};
+ \end{c++}
+\end{leftbar}
+
+在实现文件中，搬迁主干逻辑至\ascii{TestCase::runBare}。
 
 \begin{leftbar}
  \begin{c++}[caption={\ttfamily{src/mars/core/TestCase.cc}}]
@@ -1069,6 +1103,24 @@ void TestCase::runBare() {
 void TestCase::run(TestResult& result) {
   result.onRun();
   runBare();
+}
+ \end{c++}
+\end{leftbar}
+
+\subsubsection{重构TestSuite}
+
+重构\ascii{TestSuite::run}，每次迭代将\ascii{result}透传给\ascii{Test::run}，实现多态调用。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{src/mars/core/TestSuite.cc}}]
+#include "mars/core/TestSuite.h"
+
+// ...
+
+void TestSuite::run(TestResult& result) {
+  foreach([&result](auto test) {
+    test->run(result);
+  });
 }
  \end{c++}
 \end{leftbar}
@@ -1128,14 +1180,15 @@ TEST_F(TestSuiteSpec, run_multi_test_cases_using_test_suite) {
  \begin{c++}[caption={\ttfamily{include/mars/core/Test.h}}]
 #include <string>
 
+struct TestResult;
+
 struct Test {
   explicit Test(const std::string& name = "");
-  virtual ~Test() {}
-
   const std::string& getName() const;
 
+  virtual ~Test() {}
   virtual int countTestCases() const = 0;
-  virtual void run() = 0;
+  virtual void run(TestResult&) = 0;
 
 private:
   std::string name;
@@ -1192,10 +1245,21 @@ expected value == 2, but got 0
 
 \begin{leftbar}
  \begin{c++}[caption={\ttfamily{test/mars/TestCaseSpec.cc}}]
+#include <gtest/gtest.h>
 #include "mars/core/TestCase.h"
 #include "mars/except/AssertionError.h"
 
 namespace {
+  struct TestCaseSpec : testing::Test {
+  protected:
+    void run(::Test& test) {
+      test.run(result);
+    }
+
+  protected:
+    TestResult result;
+  };
+
   struct AssertionFailedTest : TestCase {
     void runTest() override {
       throw AssertionError("test.cpp:57", "expected value == 2, but got 3");
@@ -1249,7 +1313,7 @@ const char* AssertionError::what() const noexcept {
  \end{c++}
 \end{leftbar}
 
-\subsubsection{通过编译}
+\subsubsection{失败计数器}
 
 \ascii{TestResult}新增名为\ascii{numOfFails}的计数器。
 
@@ -1267,7 +1331,7 @@ private:
  \end{c++}
 \end{leftbar}
 
-\subsubsection{通过链接}
+在实现文件中，实现失败计数器的初始化，累加，与查询逻辑。
 
 \begin{leftbar}
  \begin{c++}[caption={\ttfamily{src/mars/core/TestResult.cc}}]
@@ -1286,7 +1350,7 @@ void TestResult::onFail() {
  \end{c++}
 \end{leftbar}
 
-\subsubsection{通过测试}
+\subsubsection{捕获异常}
 
 当执行\ascii{TestCase::run}时，捕获异常并通过调用\ascii{TestResult::fail}，累加计数器\ascii{numOfFails}。
 
@@ -1294,6 +1358,7 @@ void TestResult::onFail() {
  \begin{c++}[caption={\ttfamily{src/mars/core/TestCase.cc}}]
 #include "mars/core/TestCase.h"
 #include "mars/core/TestResult.h"
+#include "mars/except/AssertionError.h"
 
 void TestCase::run(TestResult& result) {
   setUp();
@@ -1306,6 +1371,8 @@ void TestCase::run(TestResult& result) {
 
   tearDown();
 }
+
+// ...
  \end{c++}
 \end{leftbar}
 
@@ -1342,7 +1409,7 @@ TEST_F(TestCaseSpec, throw_assertion_error_on_setup) {
  \end{c++}
 \end{leftbar}
 
-\subsubsection{通过测试}
+\subsubsection{捕获异常}
 
 为了通过测试，当执行\ascii{TestCase::setUp}时，捕获异常并通知\ascii{TestResult}，然后立即终止用例的执行；毕竟环境没准备好，强制执行用例毫无意义。
 
@@ -1350,6 +1417,7 @@ TEST_F(TestCaseSpec, throw_assertion_error_on_setup) {
  \begin{c++}[caption={\ttfamily{src/mars/core/TestCase.cc}}]
 #include "mars/core/TestCase.h"
 #include "mars/core/TestResult.h"
+#include "mars/except/AssertionError.h"
 
 void TestCase::run(TestResult& result) {
   bool succ = false;
@@ -1398,7 +1466,7 @@ TEST_F(TestCaseSpec, throw_assertion_error_on_tear_down) {
  \end{c++}
 \end{leftbar}
 
-\subsubsection{通过测试}
+\subsubsection{捕获异常}
 
 当执行\ascii{TestCase::tearDown}时，捕获异常并通知\ascii{TestResult}。但是，无论\ascii{setUp, runTest}成败与否，\ascii{tearDown}都要强制执行，保证资源的安全释放。
 
@@ -1406,6 +1474,7 @@ TEST_F(TestCaseSpec, throw_assertion_error_on_tear_down) {
  \begin{c++}[caption={\ttfamily{src/mars/core/TestCase.cc}}]
 #include "mars/core/TestCase.h"
 #include "mars/core/TestResult.h"
+#include "mars/except/AssertionError.h"
 
 void TestCase::run(TestResult& result) {
   bool succ = false;
@@ -1435,7 +1504,7 @@ void TestCase::run(TestResult& result) {
 
 至此，测试通过。
 
-\subsection{异常与错误}
+\subsection{失败与错误}
 
 当抛出\ascii{AssertionError}，称之为\ascii{Failure}；当抛出其他异常，称之为\ascii{Error}。构建失败的用例，模拟其他异常抛出的场景。
 
@@ -1459,6 +1528,56 @@ TEST_F(TestCaseSpec, throw_std_exception_on_run_test) {
  \end{c++}
 \end{leftbar}
 
+\subsubsection{错误计数器}
+
+增加查询函数\ascii{TestResult::errorCount}查询函数，错误监听接口\ascii{TestResult::onError}，及其相应的错误计数器\ascii{numOfErrors}。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{include/mars/core/TestResult.h}}]
+struct TestResult {
+  TestResult();
+
+  int failCount() const;
+  int errorCount() const;
+
+  void onFail();
+  void onError();
+
+private:
+  int numOfFails;
+  int numOfErrors;
+};
+ \end{c++}
+\end{leftbar}
+
+在实现文件中，依葫芦画瓢，实现\ascii{TestResult::errorCount, TestResult::onError}。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{src/mars/core/TestResult.cc}}]
+#include "mars/core/TestResult.h"
+
+TestResult::TestResult()
+  : numOfFails(0), numOfErrors(0) {
+}
+
+int TestResult::failCount() const {
+  return numOfFails;
+}
+
+int TestResult::errorCount() const {
+  return numOfErrors;
+}
+
+void TestResult::onFail() {
+  numOfFails++;
+}
+
+void TestResult::onError() {
+  numOfErrors++;
+}
+ \end{c++}
+\end{leftbar}
+
 \subsubsection{捕获异常}
 
 当执行\ascii{TestCase::runTest}时，捕获\ascii{std::exception}异常，并通知\ascii{TestResult::error}累加计数器。
@@ -1467,6 +1586,7 @@ TEST_F(TestCaseSpec, throw_std_exception_on_run_test) {
  \begin{c++}[caption={\ttfamily{src/mars/core/TestCase.cc}}]
 #include "mars/core/TestCase.h"
 #include "mars/core/TestResult.h"
+#include "mars/except/AssertionError.h"
 
 void TestCase::run(TestResult& result) {
   bool succ = false;
@@ -1495,58 +1615,6 @@ void TestCase::run(TestResult& result) {
 }
  \end{c++}
 \end{leftbar}
-
-\subsubsection{错误计数器}
-
-增加\ascii{TestResult::errorCount}的成员函数，及其相应的计数器\ascii{numOfErrors}。
-
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{include/mars/core/TestResult.h}}]
-struct TestResult {
-  TestResult();
-
-  int failCount() const;
-  int errorCount() const;
-
-  void onFail();
-  void onError();
-
-private:
-  int numOfFails;
-  int numOfErrors;
-};
- \end{c++}
-\end{leftbar}
-
-\subsubsection{通过链接}
-
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{src/mars/core/TestResult.cc}}]
-#include "mars/core/TestResult.h"
-
-TestResult::TestResult()
-  : numOfFails(0)， numOfErrors(0) {
-}
-
-int TestResult::failCount() const {
-  return numOfFails;
-}
-
-int TestResult::failCount() const {
-  return numOfErrors;
-}
-
-void TestResult::onFail() {
-  numOfFails++;
-}
-
-void TestResult::onError() {
-  numOfErrors++;
-}
- \end{c++}
-\end{leftbar}
-
-至此，测试通过。
 
 \subsection{未知错误}
 
@@ -1580,6 +1648,7 @@ TEST_F(TestCaseSpec, throw_unknown_exception_on_run_test) {
  \begin{c++}[caption={\ttfamily{src/mars/core/TestCase.cc}}]
 #include "mars/core/TestCase.h"
 #include "mars/core/TestResult.h"
+#include "mars/except/AssertionError.h"
 
 void TestCase::run(TestResult& result) {
   bool succ = false;
@@ -1621,6 +1690,7 @@ void TestCase::run(TestResult& result) {
  \begin{c++}[caption={\ttfamily{src/mars/core/TestCase.cc}}]
 #include "mars/core/TestCase.h"
 #include "mars/core/TestResult.h"
+#include "mars/except/AssertionError.h"
 
 void TestCase::run(TestResult& result) {
   bool succ = false;
@@ -1657,14 +1727,16 @@ void TestCase::run(TestResult& result) {
     result.onError();
   }
 }
+
+// ...
  \end{c++}
 \end{leftbar}
 
-至此，\ascii{TestCase::runBare}的实现，不仅存在重复逻辑，而且异常臃肿，异常丑陋。此时不重构，更待何时。
+\ascii{TestCase::run}实现不仅存在重复逻辑，而且异常臃肿，异常丑陋。此时不重构，更待何时。
 
 \subsubsection{消除重复}
 
-观察\ascii{TestCase::setUp, TestCase::runTest, TestCase::tearDown}之间的共性，它们拥有相同的函数签名，可以使用指向成员函数的指针挖掘它们的共性。
+观察\ascii{TestCase::setUp, TestCase::runTest, TestCase::tearDown}的共性，它们拥有相同的函数签名，可以使用指向成员函数的指针挖掘它们的共性。
 
 \begin{leftbar}
  \begin{c++}
@@ -1672,14 +1744,38 @@ using Method = void(TestCase::*)();
  \end{c++}
 \end{leftbar}
 
-提取公共函数\ascii{TestCase::protect}，它返回\ascii{bool}类型。
+提取公共函数\ascii{TestCase::protect}，它返回\ascii{bool}类型。首先，在头文件中声明私有函数\ascii{TestCase::protect}。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{include/mars/core/TestCase.h}}]
+#include "mars/core/Test.h"
+
+struct TestCase : Test {
+  using Test::Test;
+
+private:
+  int countTestCases() const override;
+  void run(TestResult&) override;
+
+private:
+  virtual void setUp() {}
+  virtual void runTest() {}
+  virtual void tearDown() {}
+
+private:
+  using Method = void(TestCase::*)();
+  bool protect(TestResult& result, Method method);
+};
+ \end{c++}
+\end{leftbar}
+
+在实现文件中，实现异常处理逻辑的代码复用。
 
 \begin{leftbar}
  \begin{c++}[caption={\ttfamily{src/mars/core/TestCase.cc}}]
 #include "mars/core/TestCase.h"
 #include "mars/core/TestResult.h"
-
-using Method = void(TestCase::*)();
+#include "mars/except/AssertionError.h"
 
 bool TestCase::protect(TestResult& result, Method method) {
   bool succ = false;
@@ -1702,6 +1798,10 @@ void TestCase::run(TestResult& result) {
   }
   protect(result, &TestCase::tearDown);
 }
+
+int TestCase::countTestCases() const {
+  return 1;
+}
  \end{c++}
 \end{leftbar}
 
@@ -1711,24 +1811,24 @@ void TestCase::run(TestResult& result) {
 
 \begin{content}
 
-分析\ascii{TestCase}实现，\ascii{TestCase::setUp, TestCase::runTest, TestCase::tearDown}宿主于\ascii{TestCase}，而异常处理逻辑主要宿主于\ascii{TestResult}。根据迪米特法则，这段异常处理的逻辑应搬迁至\ascii{TestResult}；当捕获异常后，直接更新到自己的私有数据域，使得\ascii{TestResult::onRun, TestResult::onFail, TestResult::onError}等监听接口完全私有化。
+分析\ascii{TestCase}实现，\ascii{TestCase::setUp, TestCase::runTest, TestCase::tearDown}宿主于\ascii{TestCase}，而异常处理逻辑主要宿主于\ascii{TestResult}。
 
-但是，\ascii{TestResult}如何调用到\ascii{TestCase::setUp, TestCase::runTest, TestCase::tearDown}成员函数呢？此时似乎陷入窘境，因为\ascii{TestCase}与\ascii{TestResult}之间的耦合太过紧密，拆分显得不是那么容易。
+根据迪米特法则，这段异常处理的逻辑应搬迁至\ascii{TestResult}。当捕获异常后，直接更新到自己的私有数据域，使得\ascii{TestResult::onRun, TestResult::onFail, TestResult::onError}等监听接口完全私有化。
 
-因此，解除\ascii{TestCase}与\ascii{TestResult}之间的耦合迫在眉睫。
+但是，\ascii{TestResult}如何调用到\ascii{TestCase::setUp, TestCase::runTest, TestCase::tearDown}成员函数呢？此时似乎陷入窘境，毕竟\ascii{TestCase}与\ascii{TestResult}之间的耦合太过紧密，拆分显得不是那么容易。
 
-\subsection{引入TestCaseFunctor}
+解除\ascii{TestCase}与\ascii{TestResult}之间的耦合迫在眉睫。
 
-引入\ascii{TestCaseFunctor}的抽象类型，让\ascii{TestResult}依赖于\ascii{TestCaseFunctor}的抽象类型，而非具体的\ascii{TestCase}。一方面，它可以获知\ascii{TestCase}的名字；另一方面它可以调用\ascii{TestCase::setUp}, 或\ascii{TestCase::runTest}, 或\ascii{TestCase::tearDown}。
+\subsection{关键抽象: TestCaseFunctor}
+
+为了彻底解开\ascii{TestCase::protect}对\ascii{TestCase}的依赖，引入关键抽象\ascii{TestCaseFunctor}，相对\ascii{TestCase::Method}的简单抽象，它更加稳定，更加具有可扩展性(可以携带更多元数据，例如增加\ascii{getTestName}接口)。
 
 \begin{leftbar}
  \begin{c++}[caption={\ttfamily{include/mars/core/internal/TestCaseFunctor.h}}]
 #include <string>
 
 struct TestCaseFunctor {
-  virtual ~TestFunctor() {}
-
-  virtual const std::string& getTestName() const = 0;  
+  virtual ~TestCaseFunctor() {}
   virtual bool operator()() const = 0;
 };
  \end{c++}
@@ -1736,13 +1836,13 @@ struct TestCaseFunctor {
 
 \subsubsection{实现TestCaseFunctor}
 
-\ascii{TestCase::Functor}是\ascii{TestCaseFunctor}背后运行的基石，它封装了\ascii{TestCase::setUp, TestCase::runTest, TestCase::tearDown}的调用。
-
-一方面，\ascii{TestCase::Functor}被声明为\ascii{private}，屏蔽外界的访问；另一方面，它能够调用\ascii{TestCase}的私有成员，例如私有的\ascii{TestCase::getTestName}。
+在\ascii{TestCase.h}的文件中，修改\ascii{TestCase::protect}的声明，让其依赖于更稳定的抽象\ascii{TestCaseFunctor}，而非简单抽象\ascii{TestCase::Method}，因为\ascii{TestCaseFunctor}不包含\ascii{TestCase}的任何信息。
 
 \begin{leftbar}
  \begin{c++}[caption={\ttfamily{include/mars/core/TestCase.h}}]
 #include "mars/core/Test.h"
+
+struct TestCaseFunctor;
 
 struct TestCase : Test {
   using Test::Test;
@@ -1757,18 +1857,19 @@ private:
   virtual void tearDown() {}
 
 private:
-  struct Functor;
-  std::string name;
+  bool protect(TestResult&, const TestCaseFunctor&);
 };
  \end{c++}
 \end{leftbar}
 
-在\ascii{TestCase.cc}的实现文件中，实现\ascii{TestCase::Functor}的逻辑。
+在\ascii{TestCase.cc}实现文件中，在匿名命名空间内定义实现\ascii{Functor}，它是\ascii{TestCaseFunctor}背后运行的真正实现，它包装实现了原来\ascii{TestCase::Method}的间接调用。
 
 \begin{leftbar}
  \begin{c++}[caption={\ttfamily{src/mars/core/TestCase.cc}}]
-#include "mars/core/TestCase.cc"
+#include "mars/core/TestCase.h"
+#include "mars/core/TestResult.h"
 #include "mars/core/internal/TestCaseFunctor.h"
+#include "mars/except/AssertionError.h"
 
 namespace {
   struct Functor : TestCaseFunctor {
@@ -1779,10 +1880,6 @@ namespace {
     }
 
   private:
-    const std::string& getTestName() const override {
-      return self->getName();
-    }
-
     bool operator()() const override {
       (self->*method)();
       return true;
@@ -1794,42 +1891,62 @@ namespace {
   };
 }
 
-void TestCase::run(TestResult& result) {
-  if (result.protect(Functor(this, &TestCase::setUp, "in the setUp"))) {
-    result.protect(Functor(this, &TestCase::runTest, "in the runTest"));
+bool TestCase::protect(TestResult& result, const TestCaseFunctor& f) {
+  try {
+    return f();
+  } catch (const AssertionError&) {
+    result.onFail();
+  } catch (const std::exception&) {
+    result.onError();
+  } catch (...) {
+    result.onError();
   }
-  result.protect(Functor(this, &TestCase::tearDown， "in the tearDown"));
+  return false;
 }
- \end{c++}
-\end{leftbar}
-
-其中，\ascii{TestResult::protect}将搬迁异常处理的逻辑，使其各司其职，留待还需处理。
-
-\subsubsection{改善表达力}
-
-可以引入一个宏定义，改善\ascii{TestResult::protect}调用的表达力。不忘初心，\ascii{TestCase::runBare}的算法主干回归至最开始的简单逻辑，但它已经具备完备的异常处理机制。
-
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{src/mars/core/TestCase.cc}}]
-#define PROTECT(method) \
-    result.protect(Functor(this, &TestCase::method， "in the "#method))
 
 void TestCase::run(TestResult& result) {
-  if (PROTECT(setUp)) {
-    PROTECT(runTest);
+  if (protect(result, Functor(this, &TestCase::setUp))) {
+    protect(result, Functor(this, &TestCase::runTest));
   }
-  PROTECT(tearDown);
+  protect(result, Functor(this, &TestCase::tearDown));
 }
  \end{c++}
 \end{leftbar}
 
 \subsection{搬迁异常逻辑}
 
-接下来，运用迪米特法则，将异常处理的逻辑\ascii{TestCase::protect}搬迁到\ascii{TestResult}。此外，\ascii{TestResult::protect}依赖与\ascii{TestCaseFunctor}的抽象类型，而非具体的\ascii{TestCase}，实现了\ascii{TestResult}对\ascii{Test}的解耦。
+运用迪米特法则，将异常处理的逻辑从\ascii{TestCase::protect}搬迁至\ascii{TestResult::protect}。因为\ascii{TestResult::protect}依赖与\ascii{TestCaseFunctor}的抽象类型，而非具体的\ascii{TestCase}，实现了\ascii{TestResult}对\ascii{TestCase}的解耦。在头文件中，公开\ascii{TestResult::protect}，而私有\ascii{onFail, onError}。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{include/mars/core/TestResult.h}}]
+struct TestCaseFunctor;
+
+struct TestResult {
+  TestResult();
+
+  int failCount() const;
+  int errorCount() const;
+
+  bool protect(const TestCaseFunctor&);
+
+private:
+  void onFail();
+  void onError();
+
+private:
+  int numOfFails;
+  int numOfErrors;
+};
+ \end{c++}
+\end{leftbar}
+
+在实现文件中，搬迁异常处理逻辑至此处。
 
 \begin{leftbar}
  \begin{c++}[caption={\ttfamily{src/mars/core/TestResult.cc}}]
+#include "mars/core/TestResult.h"
 #include "mars/core/internal/TestCaseFunctor.h"
+#include "mars/except/AssertionError.h"
 
 bool TestResult::protect(const TestCaseFunctor& f) {
   try {
@@ -1846,7 +1963,68 @@ bool TestResult::protect(const TestCaseFunctor& f) {
  \end{c++}
 \end{leftbar}
 
-\subsection{传递异常}
+\subsubsection{重构TestCase}
+
+重构\ascii{TestCase}，使其调用\ascii{TestResult::protect}完成异常处理的逻辑。测试通过后，删除既有的\ascii{TestCase::protect}。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{src/mars/core/TestCase.cc}}]
+#include "mars/core/TestCase.h"
+#include "mars/core/TestResult.h"
+#include "mars/core/internal/TestCaseFunctor.h"
+
+namespace {
+  struct Functor : TestCaseFunctor {
+    using Method = void(TestCase::*)();
+
+    Functor(TestCase* self, Method method)
+      : self(self), method(method) {
+    }
+
+  private:
+    bool operator()() const override {
+      (self->*method)();
+      return true;
+    }
+
+  private:
+    TestCase* self;
+    Method method;
+  };
+}
+
+void TestCase::run(TestResult& result) {
+  if (result.protect(Functor(this, &TestCase::setUp))) {
+    result.protect(Functor(this, &TestCase::runTest));
+  }
+  result.protect(Functor(this, &TestCase::tearDown));
+}
+ \end{c++}
+\end{leftbar}
+
+\subsubsection{改善表达力}
+
+可以定义一个宏，改善\ascii{TestCase::run}对\ascii{TestResult::protect}调用的表达力。不忘初心，\ascii{TestCase::run}算法主干回归至最开始的简单逻辑。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{src/mars/core/TestCase.cc}}]
+#define PROTECT(method) \
+    result.protect(Functor(this, &TestCase::method))
+
+void TestCase::run(TestResult& result) {
+  if (PROTECT(setUp)) {
+    PROTECT(runTest);
+  }
+  PROTECT(tearDown);
+}
+ \end{c++}
+\end{leftbar}
+
+\end{content}
+
+\section{异常信息}
+
+\begin{content}
 
 为了给用户提供更为精准的异常信息，需要将其存储于\ascii{TestResult}。首先提取\ascii{TestFailure}的概念，将所有异常信息打包到一起。
 
