@@ -14,8 +14,6 @@
 	
 \begin{content}
 
-\subsection{xUnit架构}
-
 \subsection{接口设计}
 
 使用\ascii{C++}描述\ascii{xUnit}的样例，相对于\ascii{Google Test}，此处做了如下几个方面的革新。
@@ -57,6 +55,21 @@ FIXTURE(StackSpec) {
 }; 
  \end{c++}
 \end{leftbar}
+
+\subsection{系统架构}
+
+将预开发的系统命名为\ascii{xUnit Mars}，它完成类似\ascii{Google Test}的功能特性。但是，\ascii{xUnit Mars}的用例设计风格，系统架构等多个方面，与\ascii{Google Test}相比存在很多不同之处。
+
+在开发初期，\ascii{xUnit Mars}使用\ascii{Google Test}作为\ascii{TDD}的开发工具，待\ascii{xUnit Mars}完成基本功能，并发布\ascii{Release}之后，将所有测试用例重构为\ascii{xUnit Mars}风格。
+
+基于\ascii{xUnit Mars}的基本特性，可以改善使用\ascii{Modern C++}开发各类\ascii{App}的体验。\ascii{xUnit Mars}系统架构初步预想如\refig{mars-framework}所示。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.4\textwidth]{figures/xunit/framework.png}
+\caption{xUnit Mars: 系统架构}
+ \label{fig:mars-framework}
+\end{figure}
 
 \end{content}
 
