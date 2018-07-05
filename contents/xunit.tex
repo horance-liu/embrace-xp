@@ -16,7 +16,7 @@
 
 \subsection{接口设计}
 
-使用\ascii{C++}描述\ascii{xUnit}的样例，相对于\ascii{Google Test}，此处做了如下几个方面的革新。
+假定预开发的系统名为\ascii{xUnit Mars}，它完成类似\ascii{Google Test}的功能特性。相对于\ascii{Google Test}，\ascii{xUnit Mars}改善了用例描述的表达力，主要包括如下几个方面。
 
 \begin{enum}
   \eitem{\ascii{在同一个类域内，使得TEST与SETUP/TEARDOWN关系更加紧密；}}
@@ -57,11 +57,11 @@ FIXTURE(StackSpec) {
 
 \subsection{系统架构}
 
-将预开发的系统命名为\ascii{xUnit Mars}，它完成类似\ascii{Google Test}的功能特性。但是，\ascii{xUnit Mars}的用例设计风格，系统架构等多个方面，与\ascii{Google Test}相比存在很多不同之处。
+\ascii{xUnit Mars}功能特性与\ascii{Google Test}存在明显的重合度。但是，\ascii{xUnit Mars}的用例设计风格与系统架构，相比\ascii{Google Test}存在巨大的差异。
 
-在开发初期，\ascii{xUnit Mars}使用\ascii{Google Test}作为\ascii{TDD}的开发工具，待\ascii{xUnit Mars}完成基本功能，并发布\ascii{Release}之后，将所有测试用例重构为\ascii{xUnit Mars}风格。
+在开发初期，\ascii{xUnit Mars}使用\ascii{Google Test}作为\ascii{TDD}的开发工具，待\ascii{xUnit Mars}完成基本功能，并发布稳定版本之后，可将既有测试用例重构为\ascii{xUnit Mars}风格。
 
-基于\ascii{xUnit Mars}的基本特性，可以改善使用\ascii{Modern C++}开发各类\ascii{App}的体验。\ascii{xUnit Mars}系统架构初步预想如\refig{mars-framework}所示。
+基于\ascii{xUnit Mars}基本特性，可以改善使用\ascii{Modern C++}开发各类应用程序的用户体验。初步预想，\ascii{xUnit Mars}系统架构如\refig{mars-framework}所示。
 
 \begin{figure}[H]
 \centering
@@ -78,17 +78,17 @@ FIXTURE(StackSpec) {
 
 \subsection{环境准备}
 
-创建一个项目并命名为\ascii{mars}，然后在项目的顶层目录初始化一个\ascii{git}库。
+创建一个项目并命名为\ascii{mars}，然后在项目的顶层目录初始化一个空的\ascii{git}库。
 
 \begin{leftbar}
  \begin{c++}[caption={\ttfamily{初始化git库}}] 
-$ git init 
+$ git init
  \end{c++}
 \end{leftbar}  
 
 \subsubsection{项目组织}
 
-项目目录结构如下。
+\ascii{xUnit Mars}项目的物理目录结构如下所示。
 
 \begin{leftbar}
  \begin{c++}[caption={\ttfamily{项目组织}}]
@@ -106,14 +106,14 @@ mars
  \end{c++}
 \end{leftbar}
 
-\subsubsection{CMakeList实现}
+\subsubsection{构建工具}
 
-主控的\ascii{CMakeLists.txt}内容如下：
+\ascii{xUnit Mars}使用\ascii{CMake}构建工具，项目根目录下的主控\ascii{CMakeLists.txt}内容如下：
 
 \begin{leftbar}
  \begin{c++}[caption={\ttfamily{CMakeLists.txt}}]
 project(mars)                                                                                  
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 2.8)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
 
@@ -124,7 +124,7 @@ add_subdirectory(test)
  \end{c++}
 \end{leftbar}
 
-\ascii{src/CMakeLists.txt}完成\ascii{mars}库的构建。
+\ascii{src/CMakeLists.txt}完成\ascii{mars}库构建。
 
 \begin{leftbar}
  \begin{c++}[caption={\ttfamily{src/CMakeLists.txt}}]
@@ -133,7 +133,7 @@ add_library(mars STATIC ${all_files})
  \end{c++}
 \end{leftbar}
 
-\ascii{test/CMakeLists.txt}完成\ascii{mars-test}应用程序的构建，执行\ascii{mars}的测试用例。
+\ascii{test/CMakeLists.txt}完成\ascii{mars-test}应用程序构建，它执行\ascii{xUnit Mars}项目的所有测试用例。
 
 \begin{leftbar}
  \begin{c++}[caption={\ttfamily{test/CMakeLists.txt}}]
@@ -143,18 +143,18 @@ target_link_libraries(mars-test mars gtest gtest_main pthread)
  \end{c++}
 \end{leftbar}
 
-提交代码。
+项目组建完毕，提交代码。
 
 \begin{leftbar}
  \begin{c++}[caption={\ttfamily{提交代码}}] 
-$ git add -A .
+$ git add .
 $ git commit -m"setup project"
  \end{c++}
-\end{leftbar}  
+\end{leftbar}
 
 \subsection{起航}
 
-万事开头难，第一个用例跑起来并不容易。此处设计实现了一个简单的测试用例，用户通过扩展框架的\ascii{TestCase}，实现测试用例的新增。一般地，在面向对象设计中，通常通过扩展子类是实现开放封闭原则的重要手段。
+万事开头难，第一个用例跑起来并不容易。此处设计实现了一个简单的测试用例，用户通过扩展\ascii{xUnit Mars}框架中的\ascii{TestCase}，新增新的测试用例。一般地，在面向对象设计中，扩展子类实现是遵循开放封闭原则的重要手段。
 
 \begin{leftbar}
  \begin{c++}[caption={\ttfamily{test/mars/core/TestCaseSpec.cc}}]
@@ -208,6 +208,30 @@ struct TestCase {
  \end{c++}
 \end{leftbar}
 
+\begin{story}
+  \begin{center}
+    \inlinetitle{多屏编辑}
+  \end{center}
+
+\begin{content}
+
+在\cpp{}编程实践中，需要在头文件和实现文件之间频繁切换。同时，在\ascii{TDD}编程实践中，也需要在测试文件与头文件/实现文件之间频繁切换。得益于现代\ascii{IDE}的丰富特性，推荐多屏显示相关源文件。例如，如\refig{multi-editor-eclipse}所示，使用\ascii{Eclipse CDT}，三屏分别显示相关联的头文件、实现文件，及其测试用例文件。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=1.0\textwidth]{figures/xunit/multi-editor-eclipse.png}
+\caption{Eclipse CDT: 多屏显示}
+ \label{fig:multi-editor-eclipse}
+\end{figure}
+
+因此，推荐购置高清，大屏的显示器，有效改善编程环境，从而提高工作效率。此外，推荐关闭其他无关的\ascii{Tab}页，只打开当前相关的源文件，最小化外部干扰；一则让\ascii{IDE}运行速度最佳，二则使用诸如\ascii{Ctrl + E}快捷键切换文件时，最小化文件列表长度。
+
+强烈推荐使用快捷键的优秀实践，可以成倍地提高编程的效率。例如，使用\ascii{Eclipse CDT}，可以使用快捷键\ascii{Ctrl + Tab}，在头文件与实现文件间切换自如。
+
+\end{content}
+
+\end{story}
+
 \subsubsection{通过测试}
 
 在\ascii{build}临时目录中，使用\ascii{cmake}构建工程。
@@ -249,6 +273,23 @@ $ git add -A .
 $ git commit -m"pass first test case"
  \end{c++}
 \end{leftbar}
+
+\begin{story}
+  \begin{center}
+    \inlinetitle{后悔药}
+  \end{center}
+
+\begin{content}
+
+感谢\ascii{Linus}创造了\ascii{Linux}与\ascii{Git}，让全世界的程序员享受编程的快乐。熟练运用\ascii{Git}工具，避免不经意的错误而丢失代码。
+
+养成经常性提交代码至本地，是一种良好的编程习惯。在\ascii{TDD}实践的一个微循环中，当编译通过时，立即执行\ascii{git add}；当链接通过时，立即执行\ascii{git add}；当测试通过时，立即执行\ascii{git add}；当完成重构的关键步骤时，也应该立即执行\ascii{git add}；当重构完毕，设计达到合理状态，理解执行\ascii{git commit}。
+
+
+
+\end{content}
+
+\end{story}
 
 \end{content}
 
