@@ -24,7 +24,6 @@
   \eitem{\ascii{避免setup/setUp/SetUp大小写混用而引发错误。}}
 \end{enum}
 
-
 \begin{leftbar}
  \begin{c++}
 #include "mars/mars.h"
@@ -2708,21 +2707,16 @@ bool TestResult::protect(const TestCaseFunctor& f) {
   } catch (const AssertionError& e) {
     onFail(failure(msg("assertion fail", f.where(), e.what())));
   } catch (const std::exception& e) {
-    onError(error(msg("uncaught std::exception", f.where(), e.what())));
+    onFail(error(msg("uncaught std::exception", f.where(), e.what())));
   } catch (...) {
-    onError(error(msg("uncaught unknown exception", f.where())));
+    onFail(error(msg("uncaught unknown exception", f.where())));
   }
   return false;
 }
 
 void TestResult::onFail(TestFailure* f) {
   failures.push_back(f);
-  numOfFails++;
-}
-
-void TestResult::onError(TestFailure* f) {
-  failures.push_back(f);
-  numOfErrors++;
+  f->isFailure() ? numOfFails++ : numOfErrors++; 
 }
  \end{c++}
 \end{leftbar}
