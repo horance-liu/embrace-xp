@@ -1,0 +1,227 @@
+\begin{savequote}[45mm]
+\ascii{Any fool can write code that a computer can understand. Good programmers write code that humans can understand.}
+\qauthor{\ascii{- Martin Flower}}
+\end{savequote}
+
+\chapter{解耦合} 
+\label{ch:decoupling}
+
+\begin{content}
+
+\end{content}
+
+\section{关键抽象}
+
+\begin{content}
+
+分析\ascii{TestCase}实现，\ascii{TestCase::setUp, TestCase::runTest, TestCase::tearDown}宿主于\ascii{TestCase}，而异常处理逻辑主要宿主于\ascii{TestResult}。
+
+根据迪米特法则，这段异常处理的逻辑应搬迁至\ascii{TestResult}。当捕获异常后，直接更新到自己的私有数据域，使得\ascii{TestResult::onRun, TestResult::onFail, TestResult::onError}等监听接口完全私有化。
+
+但是，\ascii{TestResult}如何调用到\ascii{TestCase::setUp, TestCase::runTest, TestCase::tearDown}成员函数呢？此时似乎陷入窘境，毕竟\ascii{TestCase}与\ascii{TestResult}之间的耦合太过紧密，拆分显得不是那么容易。
+
+解除\ascii{TestCase}与\ascii{TestResult}之间的耦合迫在眉睫。
+
+\subsection{引入TestCaseFunctor}
+
+为了彻底解开\ascii{TestCase::protect}对\ascii{TestCase}的依赖，引入关键抽象\ascii{TestCaseFunctor}，相对\ascii{TestCase::Method}的简单抽象，它更加稳定，更加具有可扩展性(可以携带更多元数据，例如增加\ascii{getTestName}接口)。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{include/mars/core/internal/TestCaseFunctor.h}}]
+#include <string>
+
+struct TestCaseFunctor {
+  virtual ~TestCaseFunctor() {}
+  virtual bool operator()() const = 0;
+};
+ \end{c++}
+\end{leftbar}
+
+\subsection{实现TestCaseFunctor}
+
+在\ascii{TestCase.h}的文件中，修改\ascii{TestCase::protect}的声明，让其依赖于更稳定的抽象\ascii{TestCaseFunctor}，而非简单抽象\ascii{TestCase::Method}，因为\ascii{TestCaseFunctor}不包含\ascii{TestCase}的任何信息。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{include/mars/core/TestCase.h}}]
+#include "mars/core/Test.h"
+
+struct TestCaseFunctor;
+
+struct TestCase : Test {
+  using Test::Test;
+
+private:
+  int countTestCases() const override;
+  void run(TestResult&) override;
+
+private:
+  virtual void setUp() {}
+  virtual void runTest() {}
+  virtual void tearDown() {}
+
+private:
+  bool protect(TestResult&, const TestCaseFunctor&);
+};
+ \end{c++}
+\end{leftbar}
+
+在\ascii{TestCase.cc}实现文件中，在匿名命名空间内定义实现\ascii{Functor}，它是\ascii{TestCaseFunctor}背后运行的真正实现，它包装实现了原来\ascii{TestCase::Method}的间接调用。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{src/mars/core/TestCase.cc}}]
+#include "mars/core/TestCase.h"
+#include "mars/core/TestResult.h"
+#include "mars/core/internal/TestCaseFunctor.h"
+#include "mars/except/AssertionError.h"
+
+namespace {
+  struct Functor : TestCaseFunctor {
+    using Method = void(TestCase::*)();
+
+    Functor(TestCase* self, Method method)
+      : self(self), method(method) {
+    }
+
+  private:
+    bool operator()() const override {
+      (self->*method)();
+      return true;
+    }
+
+  private:
+    TestCase* self;
+    Method method;
+  };
+}
+
+bool TestCase::protect(TestResult& result, const TestCaseFunctor& f) {
+  try {
+    return f();
+  } catch (const AssertionError&) {
+    result.onFail();
+  } catch (const std::exception&) {
+    result.onError();
+  } catch (...) {
+    result.onError();
+  }
+  return false;
+}
+
+void TestCase::run(TestResult& result) {
+  if (protect(result, Functor(this, &TestCase::setUp))) {
+    protect(result, Functor(this, &TestCase::runTest));
+  }
+  protect(result, Functor(this, &TestCase::tearDown));
+}
+ \end{c++}
+\end{leftbar}
+
+\section{搬迁异常逻辑}
+
+运用迪米特法则，将异常处理的逻辑从\ascii{TestCase::protect}搬迁至\ascii{TestResult::protect}。因为\ascii{TestResult::protect}依赖与\ascii{TestCaseFunctor}的抽象类型，而非具体的\ascii{TestCase}，实现了\ascii{TestResult}对\ascii{TestCase}的解耦。在头文件中，公开\ascii{TestResult::protect}，而私有\ascii{onFail, onError}。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{include/mars/core/TestResult.h}}]
+struct TestCaseFunctor;
+
+struct TestResult {
+  TestResult();
+
+  int failCount() const;
+  int errorCount() const;
+
+  bool protect(const TestCaseFunctor&);
+
+private:
+  void onFail();
+  void onError();
+
+private:
+  int numOfFails;
+  int numOfErrors;
+};
+ \end{c++}
+\end{leftbar}
+
+在实现文件中，搬迁异常处理逻辑至此处。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{src/mars/core/TestResult.cc}}]
+#include "mars/core/TestResult.h"
+#include "mars/core/internal/TestCaseFunctor.h"
+#include "mars/except/AssertionError.h"
+
+bool TestResult::protect(const TestCaseFunctor& f) {
+  try {
+    return f();
+  } catch (const AssertionError&) {
+    onFail();
+  } catch (const std::exception&) {
+    onError();
+  } catch (...) {
+    onError();
+  }
+  return false;
+}
+ \end{c++}
+\end{leftbar}
+
+\subsection{重构TestCase}
+
+重构\ascii{TestCase}，使其调用\ascii{TestResult::protect}完成异常处理的逻辑。测试通过后，删除既有的\ascii{TestCase::protect}。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{src/mars/core/TestCase.cc}}]
+#include "mars/core/TestCase.h"
+#include "mars/core/TestResult.h"
+#include "mars/core/internal/TestCaseFunctor.h"
+
+namespace {
+  struct Functor : TestCaseFunctor {
+    using Method = void(TestCase::*)();
+
+    Functor(TestCase* self, Method method)
+      : self(self), method(method) {
+    }
+
+  private:
+    bool operator()() const override {
+      (self->*method)();
+      return true;
+    }
+
+  private:
+    TestCase* self;
+    Method method;
+  };
+}
+
+void TestCase::run(TestResult& result) {
+  if (result.protect(Functor(this, &TestCase::setUp))) {
+    result.protect(Functor(this, &TestCase::runTest));
+  }
+  result.protect(Functor(this, &TestCase::tearDown));
+}
+ \end{c++}
+\end{leftbar}
+
+\subsection{改善表达力}
+
+可以定义一个宏，改善\ascii{TestCase::run}对\ascii{TestResult::protect}调用的表达力。不忘初心，\ascii{TestCase::run}算法主干回归至最开始的简单逻辑。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{src/mars/core/TestCase.cc}}]
+#define PROTECT(method) \
+    result.protect(Functor(this, &TestCase::method))
+
+void TestCase::run(TestResult& result) {
+  if (PROTECT(setUp)) {
+    PROTECT(runTest);
+  }
+  PROTECT(tearDown);
+}
+ \end{c++}
+\end{leftbar}
+
+\end{content}
+
