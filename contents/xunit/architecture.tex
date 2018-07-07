@@ -8,11 +8,21 @@
 
 \begin{content}
 
+本书通过使用\cpp{}设计和实现\ascii{xUnit}框架，透视极限编程在\cpp{}社区中的具体实践与运用，包括\ascii{简单设计}，\ascii{TDD}、重构；也会深入体会正交设计、设计原则、设计模式、整洁代码、实现模式与习惯用法在编程实践中的具体运用；也会在面向对象、函数式、泛型编程不同编程范式之间切换自如；也会尝试\ascii{DSL}设计与实现，体会代码之美，设计之美，架构之美。
+
 \end{content}
 
 \section{xUnit家谱}
-	
+
 \begin{content}
+
+\ascii{xUnit}表示一组单元测试框架集合，其基本架构思想起源于\ascii{SUnit}。\ascii{SUnit}由极限编程之父\ascii{Kent Beck}使用\ascii{SmallTalk}设计实现；随后，\ascii{Kent Beck}与\ascii{Erich Gamma}结对编程，移植实现了\ascii{Java}版本\ascii{JUnit}。
+
+\ascii{JUnit}随着\ascii{Java}社区不断壮大，及其敏捷软件开发思潮的涌现，\ascii{JUnit}当前成为\ascii{Java}程序员最常使用的框架之一。目前，\ascii{JUnit}也在不对进化与演进，截止目前\ascii{JUnit5}也在完善与开发之中。
+
+随之，各种编程语言社区都诞生了各种优秀的\ascii{xUnit}实现，包括基于\ascii{JVM}实现的高级编程语言系列。但是，它们都没有逃离\ascii{xUnit}基本框架和思维模式，唯有部分后起之秀在用户界面友好性方面取得极大的改进和提升。
+
+一则，归功于编程语言的内在特性，因为有的编程语言天然地支持\ascii{DSL}的构建；二则，归功于同门竞争，例如，基于\cpp{}语言实现的\ascii{xUnit}在社区中就存在众多实现，而且在不断演进和革新。
 
 \subsection{Google Test}
 
@@ -55,9 +65,9 @@ TEST_F(StackSpec, apply_pop_2_time) {
 
 \subsubsection{命名}
 
-\ascii{Google Test}给用户强加了一个难以接受的限制：用例名字必须遵循严格的标识符命名格则，否则编译不能通过。一方面，新增用例，或修改用例时，敲击一连串下划线是一个枯燥乏味的过程；另一方面，极大地降低了用例的可读性。
+用例名字必须遵循标识符的严格命名格则，否则编译不能通过。一方面，新增/修改用例时，输入长串下划线极度枯燥乏味；另一方面，极大地降低了用例的可读性。
 
-当命名用例成为程序员的一种负担，用例命名的的质量将大大折扣。但是，测试用例是系统行为描述最重要的活“文档”，它与被测系统代码同时一并入库，并保持同步。如果，测试用例命名质量不高，\ascii{"Test as Document"}的愿景只能沦落为痴人说梦了。
+当用例命名成为程序员的一种负担，其质量将大大折扣。但是，测试用例是系统行为描述最重要的活“文档”，它与被测系统的代码一并入库，并保持同步。如果，测试用例命名质量不高，\ascii{"Test as Document"}的愿景只能沦为痴人说梦了。
 
 \begin{leftbar}
  \begin{c++}
@@ -69,7 +79,7 @@ TEST_F(RobotCleanerTest, at_the_beginning_the_robot_should_be_in_at_the_initial_
 
 \subsubsection{重复}
 
-\ascii{RobotCleanerTest}与每个\ascii{TEST\_F}分离实现，每个用例都要重复一次\ascii{RobotCleanerTest}，程序员只能接受“拷贝-粘贴”，别无选择。
+\ascii{RobotCleanerTest}扮演\ascii{Fixure}的职责，但与每个\ascii{TEST\_F}分离实现，每个用例都要重复一次\ascii{RobotCleanerTest}，程序员只能接受“拷贝-粘贴”，别无选择。
 
 \begin{leftbar}
  \begin{c++}
@@ -91,7 +101,7 @@ TEST_F(RobotCleanerTest, should_be_face_west_after_turn_left) {
 
 \subsubsection{隐晦}
 
-\ascii{RobotCleanerTest}与\ascii{TEST\_F}应该被直观理解为类与成员函数的关系。理论上，\ascii{TEST\_F}能够直接获取到私有成员\ascii{RobotCleanerTest::robot}。
+\ascii{RobotCleanerTest}与\ascii{TEST\_F}分离实现，本应该被直观理解为类与成员函数之间的关系。理论上，\ascii{TEST\_F}能够直接获取到私有成员，例如\ascii{RobotCleanerTest::robot}。
 
 不幸的是，\ascii{RobotCleanerTest}与\ascii{TEST\_F}存在隐晦的继承关系。如果用户不了解\ascii{Google Test}的实现机制，就根本无法理解成员变量\ascii{RobotCleanerTest::robot}为什么是\ascii{protected}，而不是\ascii{private}。
 
@@ -128,7 +138,7 @@ TEST(RobotCleanerTest, at_the_beginning_the_robot_should_be_in_at_the_initial_po
 
 \subsubsection{大小写}
 
-覆写\ascii{Test::SetUp}时，经常将其错误地写为\ascii{setup, setUp, Setup}，不经意地大小写错误导致运行时测试失败。当然，如果坚持使用\ascii{override}关键字提高编译时的安全性，将错误拦截至编译期。
+覆写\ascii{Test::SetUp}时，经常将其错误地写为\ascii{setup, setUp, Setup}，不经意地大小写错误导致运行时测试失败。当然，如果坚持使用\ascii{override}关键字提高编译时的安全性，可以将错误拦截至编译期。
 
 \begin{leftbar}
  \begin{c++}
@@ -202,7 +212,7 @@ FIXTURE(StackSpec) {
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.6\textwidth]{figures/xunit/framework.png}
+\includegraphics[width=0.5\textwidth]{figures/xunit/framework.png}
 \caption{xUnit Mars: 系统架构}
  \label{fig:mars-framework}
 \end{figure}

@@ -49,6 +49,30 @@ TEST(SimpleTest, make_sure_test_case_can_run_normally) {
  \end{c++}
 \end{leftbar}
 
+\begin{story}
+  \begin{center}
+    \inlinetitle{private与override}
+  \end{center}
+
+\begin{content}
+
+感谢\ascii{Linus}创造了\ascii{Linux}与\ascii{Git}，让全世界的程序员得以享受编程的快乐。\ascii{TDD}精髓之一便是“小”，配合运用\ascii{Git}，简直就是完美，避免不经意的错误而丢失代码。
+
+养成经常性提交代码至\ascii{Git}库，是一种良好的编程习惯。在\ascii{TDD}的一个迭代循环中，每当编译通过，链接通过，测试通过，完成重构等关键环节，都立即执行\ascii{git add}。当设计重构至相对合理状态，执行\ascii{git commit}入库。在任何时刻，都可回溯至上一个稳定的状态。如\refig{tdd-git}所示。
+
+借助于\ascii{Git}，随时可以吃后悔药。当尝试某种重构设计时，没有达到预期效果，则可以轻松回到上一个稳定状态，开始尝试新的努力。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.6\textwidth]{figures/xunit/tdd-git.png}
+\caption{TDD环: 关键环节提交代码}
+ \label{fig:tdd-git}
+\end{figure}
+
+\end{content}
+
+\end{story}
+
 \subsection{通过编译}
 
 重构\ascii{TestCase}，仅公开\ascii{run}方法，并移除运行时多态的特性，它负责组织用例执行运行时的算法骨架。搬迁运行时多态行为至私有的两个虚函数，用户根据自己的场景定制\ascii{setUp}与\ascii{runTest}，分别完成测试准备，及其测试执行。
@@ -187,7 +211,7 @@ void TestCase::run() {
 
 \subsubsection{测试用例}
 
-\ascii{TestCase}作为\ascii{TestCaseRunner}的抽象策略。新增测试用时，覆写\ascii{TestCase}相关接口，实现具体实现细节。
+\ascii{TestCaseRunner}构建高层算法逻辑，而\ascii{TestCase}作为\ascii{TestCaseRunner}的抽象策略。新增测试用时，覆写\ascii{TestCase}相关接口，完成具体实现细节。实现\ascii{TestCaseRunner}的高层算法逻辑与\ascii{SimpleTest}的具体实现细节之间关系的解耦。
 
 \begin{leftbar}
  \begin{c++}
