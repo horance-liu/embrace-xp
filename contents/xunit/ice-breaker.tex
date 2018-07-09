@@ -56,7 +56,7 @@ mars
 
 \subsection{构建系统}
 
-\ascii{xUnit Mars}使用\ascii{CMake}构建工具，项目根目录下的主控\ascii{CMakeLists.txt}内容如下：
+\ascii{xUnit Mars}使用\ascii{CMake}构建工具。在项目根目录下，主控\ascii{CMakeLists.txt}完成项目的整体配置，及其子任务的组织。
 
 \begin{leftbar}
  \begin{c++}[caption={\ttfamily{CMakeLists.txt}}]
@@ -116,15 +116,6 @@ $ git commit -m"setup project"
 
 \begin{content}
 
-\ascii{TDD}是极限编程中重要的技术实践之一。如\refig{tdd-cycle}所示，\ascii{TDD}遵循小步快走，测试先行的基本方法论，每轮迭代依次执行\ascii{“Red-Green-Refactor”}。每轮迭代之后，系统都处于一个相对合理的状态。
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.8\textwidth]{figures/xunit/tdd_cycle.png}
-\caption{TDD环}
- \label{fig:tdd-cycle}
-\end{figure}
-
 \subsection{测试用例}
 
 万事开头难，第一个用例跑起来并不容易。此处设计实现了一个简单的测试用例，用户通过扩展\ascii{xUnit Mars}框架中的\ascii{TestCase}，增加新的测试用例。一般地，在面向对象设计中，扩展子类实现是遵循开放封闭原则的重要手段。
@@ -158,6 +149,26 @@ TEST(SimpleTest, make_sure_test_case_can_run_normally) {
  \end{c++}
 \end{leftbar}
 
+\begin{story}
+  \begin{center}
+    \inlinetitle{TDD: 测试驱动开发}
+  \end{center}
+
+\begin{content}
+
+\ascii{TDD}是极限编程中重要的技术实践之一。\ascii{TDD}遵循小步快走，测试先行的基本方法论，每轮迭代依次执行\ascii{“Red-Green-Refactor”}；每轮迭代之后，系统都处于一个相对合理的状态，如\refig{tdd-cycle}所示。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\textwidth]{figures/xunit/tdd_cycle.png}
+\caption{TDD环}
+ \label{fig:tdd-cycle}
+\end{figure}
+
+\end{content}
+
+\end{story}
+
 \subsection{通过编译}
 
 此处引入了多态技术，当\ascii{TestCase::run}启动运行时，将在运行时调用覆写的\ascii{SimpleTest::run}，实现自定义测试用例的执行。
@@ -190,7 +201,9 @@ struct TestCase {
   \eitem{\ascii{UUID}}
 \end{enum}
 
-第一种命名风格问题在于：当头文件被重命名或移动目录时，为了保持一致性需要同步修改头文件保护宏，而此特性\ascii{IDE}通常支持都不是太良好。因此，推荐使用\ascii{IDE}自动地随机生成\ascii{UUID}，其更加快捷、简单、并且安全、有效。其中，\ascii{Eclipse CDT}执行如下配置，使其自动生成\ascii{UUID}。
+第一种命名风格问题在于：当头文件被重命名或移动目录时，为了保持一致性需要同步修改头文件保护宏，而此特性\ascii{IDE}通常支持都不是太良好。因此，推荐使用\ascii{IDE}自动地随机生成\ascii{UUID}，其更加快捷、简单、并且安全、有效。
+
+其中，\ascii{Eclipse CDT}使用代码模板，并执行如下配置，创建头文件时自动生成\ascii{UUID}的头文件保护宏。
 
 \begin{leftbar}
  \begin{c++}[caption={\ttfamily{头文件保护宏：配置Eclipse CDT生成UUID}}]
@@ -202,6 +215,69 @@ formatter_settings_version=1
 \end{leftbar}
 
 为了缩短篇幅，后文略去所有头文件保护符。
+
+\end{content}
+
+\end{story}
+
+需要重点关注的是，\ascii{TestCase}显式地声明了虚拟的析构函数。如果不经意地遗忘声明该析构函数为虚拟的，则可能招致运行时不确定的行为发生。
+
+\begin{story}
+  \begin{center}
+    \inlinetitle{析构函数：虚拟 VS. 非虚}
+  \end{center}
+
+\begin{content}
+
+\subsubsection{虚拟析构函数}
+
+一般地，需要为虚拟的、多态基类声明虚拟析构函数。否则，会招致运行时不可预期的行为。一般地，如果一个类包含虚函数时，便将其析构函数声明为\ascii{virtual}。但是，为每个接口类型实现一个空的虚拟析构函数，显得重复而且麻烦。可以引入一个宏定义，自动引入控实现的虚拟析构函数。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{include/mars/core/Test.h}}]
+namespace details {
+  template<typename T>
+  struct Trait {
+    virtual ~Trait() {}
+  };
+}
+
+#define TRAIT(trait)  struct trait : ::details::Trait<trait>
+#define EXTENDS(...) , ##__VA_ARGS__
+ \end{c++}
+\end{leftbar}
+
+例如，\ascii{SelfDescribing}接口使用该宏定义，自动拥有虚拟析构函数的默认空实现。
+
+\begin{leftbar}
+ \begin{c++}
+struct Description;
+
+TRAIT(SelfDescribing) {
+  virtual void describeTo(Description& desc) const = 0;
+};
+ \end{c++}
+\end{leftbar}
+
+\subsubsection{非虚拟析构函数}
+
+如果一个类，显式或隐式地声明了\ascii{public}非虚拟析构函数，则该类不被用于多态，也不能被用于继承。此时，显式声明为\ascii{final}，有助于改善编译时的安全性，及其为编译器的优化提供更多的线索。例如，不可变类\ascii{Integer}声明为\ascii{final}，明确地对外声明不能被继承。
+
+\begin{leftbar}
+ \begin{c++}
+final struct Integer {
+  explicit Integer(int value);
+
+  std::string toString() const;
+  std::string toOctalString() const;
+  std::string toHexString() const;  
+  std::string toBinaryString() const;    
+
+private:
+  int value;
+};
+ \end{c++}
+\end{leftbar}
 
 \end{content}
 

@@ -69,6 +69,59 @@ private:
  \end{c++}
 \end{leftbar}
 
+\begin{story}
+  \begin{center}
+    \inlinetitle{最小依赖原则： 前置声明 VS. 包含头文件}
+  \end{center}
+
+\begin{content}
+
+当头文件中仅对类的声明产生依赖，那么前置声明是一种有效降低编译时依赖的重要技术。相反，头文件包含了本不应该包含的头文件，其编译时依赖将被间接污染到其他文件中，重编译将成为大概率事件。
+
+在包含头文件还是前置声明抉择中，其依据的规则其实非常简单。在如下场景前置声明即可，无需包含头文件。
+
+\begin{enum}
+  \eitem{\ascii{指针}}
+  \eitem{\ascii{引用}}
+  \eitem{\ascii{返回值}}
+  \eitem{\ascii{函数参数}}
+\end{enum}
+
+但是，如果编译器需要知道实体的确切内容，包括类的大小、布局、值等强编译时依赖信息，则必须包含头文件。强编译时依赖包括如下几种场景。
+
+\begin{enum}
+  \eitem{\ascii{继承}}
+  \eitem{\ascii{宏}}
+  \eitem{\ascii{inline}}
+  \eitem{\ascii{template}}
+  \eitem{\ascii{引用类内部成员时}}
+  \eitem{\ascii{值类型的类成员变量}}  
+  \eitem{执行\ascii{sizeof}运算}  
+  \eitem{\ascii{typedef/using}类型别名}
+\end{enum}
+
+例如，\ascii{TestSuite}仅对\ascii{TestCase}的指针类型产生依赖，前置声明\ascii{struct TestCase}即可。但是，\ascii{TestSuite}对值对象\ascii{std::vector}则表现为强依赖，因此需要包含头文件。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{include/mars/core/TestSuite.h}}]
+#include <vector>
+
+struct TestCase;
+
+struct TestSuite {
+  void add(TestCase* test);
+  void run();
+
+private:
+  std::vector<TestCase*> tests;
+};
+ \end{c++}
+\end{leftbar}
+
+\end{content}
+
+\end{story}
+
 \subsection{通过测试}
 
 为了通过测试，可以快速实现\ascii{TestSuite::run}的逻辑。
@@ -89,6 +142,23 @@ void TestSuite::run() {
 }
  \end{c++}
 \end{leftbar}
+
+\begin{story}
+  \begin{center}
+    \inlinetitle{验证头文件的自满足性}
+  \end{center}
+
+\begin{content}
+
+所谓头文件自满足性，即头文件自身是可编译成功的。为了验证头文件的自满足性，其对应的实现文件的第一行代码，应该包含其对应的头文件。如果此头文件不自满足，自然会导致编译失败，此方法是验证头文件是否自满足的一个有效方法。
+
+如果一个头文件不自满足，当客户需要引用该头文件时，则需要客户自行承担寻找相关依赖的职责。客户因缺乏相关上下文信息，寻找缺失的依赖并非易事。
+
+头文件作为代码的作者对外公开\ascii{API}的重要途径，在发布之前，有责任保证其可用性，并且是最小依赖的。在极端条件下，头文件可能不存在相应的实现文件。此时，也需要创建临时的实现文件，并校验头文件的自满足性；直至成功，才可以删除该临时文件。
+
+\end{content}
+
+\end{story}
 
 \subsection{内存泄露}
 
@@ -202,10 +272,86 @@ void TestSuite::run() {
  \end{c++}
 \end{leftbar}
 
+\begin{story}
+  \begin{center}
+    \inlinetitle{基于范围的for语句}
+  \end{center}
+
+\begin{content}
+
+存在泛型方法\ascii{foreach}的一种实现。不幸的是，它引入了复杂的\ascii{typedef typename}类型别名机制\footnote{\cpp{}也因诸如此类冗余的、复杂的类型说明，招致不公平的评论。}。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{foreach：应用for循环，C++98}}]
+template<typename T, typename F>
+void foreach(const std::vector<T>& c, F f) {
+  typedef typename std::vector<T>::const_iterator Iterator;
+  for (Iterator first = c.begin(), last = c.end(); first != last; ++first) {
+    f(*first);
+  }
+}
+ \end{c++}
+\end{leftbar}
+
+得益于\ascii{C++11}自动类型推演，可以去除\ascii{typedef}类型别名。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{foreach：应用for循环，auto类型推演，C++11}}]
+template<typename T, typename F>
+void foreach(const std::vector<T>& c, F f) {
+  for (auto first = c.begin(), last = c.end(); first != last; ++first) {
+    f(*first);
+  }
+}
+ \end{c++}
+\end{leftbar}
+
+甚至，可以使用基于范围的\ascii{for}语句替代常规的\ascii{for}循环。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{foreach：应用基于范围的\ascii{for}，C++11}}]
+template<typename T, typename F>
+void foreach(const std::vector<T>& c, F f) {
+  for (const T& e : c) {
+    f(e);
+  }
+}
+ \end{c++}
+\end{leftbar}
+
+可以将\ascii{auto}实施到底，\ascii{foreach}实现变得更加简单、实用。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{迭代器：应用auto类型推演，C++11}}]
+template<typename T, typename F>
+void foreach(const std::vector<T>& c, F f) {
+  for (const auto& e : c) {
+    f(e);
+  }
+}
+ \end{c++}
+\end{leftbar}
+
+遗憾的是，\ascii{foreach}不够泛型，它只能接受\ascii{std::vector}，而不能接受其他容器类型，例如\ascii{std::list, std::deque, std::set}。重构\ascii{foreach}接口，使其容器类型完全泛型化，甚至能够接受临时对象\footnote{因为容器类型使用的是\ascii{const}引用类型。}。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{实现foreach：容器泛化，C++11}}]
+template<typename Container, typename F>
+void foreach(const Container& c, F f) {
+  for (const auto& e : c) {
+    f(e);
+  }
+}
+ \end{c++}
+\end{leftbar}
+
+\end{content}
+
+\end{story}
+
 \section{嵌套结构}
 
 为了实现更好的可扩展性，\ascii{TestSuite}不仅能打包\ascii{TestCase}实例，也应该能够打包更小的\ascii{TestSuite}的子实例，实现隐式的树结构。
-
 
 \begin{figure}[H]
 \centering
@@ -216,9 +362,9 @@ void TestSuite::run() {
 
 \subsection{测试依赖}
 
-为了能够添加更多的用例，需要对计数器\ascii{num}实施初始化。当执行用例时，确保\ascii{num}被初始化为\ascii{0}；否则测试用例之间存在数据脏写的错误依赖。另外，此处没有直接调用\ascii{TestSuite::run}，而是使用更为抽象的\ascii{Test::run}，测试装置将更加稳定。
+当执行用例时，确保\ascii{num}被初始化为\ascii{0}；否则测试用例之间存在数据脏写的错误依赖。经过重构，\ascii{num}在\ascii{TestSuiteSpec::SetUp}时初始化为\ascii{0}值。遗憾的时，\ascii{num}作用域依然属于匿名命名空间，而其初始化行为被剥离至\ascii{TestSuiteSpec}的类域中。理想情况下，\ascii{num}应搬迁至某个类中，并由该类的构造函数完成初始化，该重构留待后续处理。
 
-在实现\ascii{TestSuiteSpec::run}时，显式地使用域限定符\ascii{::Test}，避免与\ascii{testing::Test}产生二义性而导致编译失败。
+此处没有直接调用\ascii{TestSuite::run}，而是使用更为抽象的\ascii{Test::run}，测试装置将更加稳定。在实现\ascii{TestSuiteSpec::run}时，显式地使用域限定符\ascii{::Test}，避免与\ascii{testing::Test}产生二义性而导致编译失败。
 
 \begin{leftbar}
  \begin{c++}[caption={\ttfamily{test/mars/core/TestSuiteSpec.cc}}]
@@ -246,6 +392,8 @@ namespace {
     void run(::Test& test) {
       test.run();
     }
+
+  protected:
   };
 }
 
@@ -276,6 +424,105 @@ TEST_F(TestSuiteSpec, package_sub_test_suite_into_outter_test_suite) {
 
 此时，第二个测试用例编译失败。
 
+\begin{story}
+  \begin{center}
+    \inlinetitle{最小化作用域}
+  \end{center}
+
+\begin{content}
+
+在古老的\ascii{C}程序设计语言中，要求在函数的开头实现声明所有的变量，这种代码风格和习惯被错误地保留。过早声明变量不仅使得变量作用域过早地扩展，而且会导致其过晚地终结，从而可能引入不经意的错误。例如，
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{while循环}}]
+auto i = c1.iterator();
+while (i.hasNext()) {
+  doSomething(i.next());
+}
+
+auto i2 = c2.iterator();
+while (i.hasNext()) {           // BUG!!!, should be i2.
+  doSomething(i2.next());
+}
+ \end{c++}
+\end{leftbar}
+
+当然，解决此类问题，最简单的办法就是引入代码块，将错误控制在编译时。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{while循环}}]
+{
+  auto i = c1.iterator();
+  while (i.hasNext()) {
+    doSomething(i.next());
+  }
+}
+
+{
+  auto i2 = c2.iterator();
+  while (i.hasNext()) {           // Compiler will be failed!
+    doSomething(i2.next());
+  }
+}
+ \end{c++}
+\end{leftbar}
+
+为了缩小局部变量的作用域，可以使用\ascii{for}循环替代\ascii{while}循环，因为\ascii{for}循环提供了初始器，天然支持代码块。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{for循环}}]
+for (auto i = c1.iterator(); i.hasNext()) {
+  use(i.next());
+}
+
+for (auto i = c2.iterator(); i.hasNext()) {
+  use(i.next());
+}
+ \end{c++}
+\end{leftbar}
+
+追其根因，两段代码最大的问题不是\ascii{while}与\ascii{for}之间的抉择，而是重复设计。因此，消除重复才能根除所有潜在的隐患\footnote{\ascii{Container}属于第三方集合库，并非\ascii{STL}。}。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{for循环}}]
+template <typename T>
+void foreach(const Container<T>& c) {
+  for (auto i = c.iterator(); i.hasNext()) {
+    use(i.next());
+  } 
+}
+ \end{c++}
+\end{leftbar}
+
+遗憾的是，目前仅\ascii{for}语句提供了初始器，直至\ascii{C++17}才完备地支持了\ascii{switch, if}语句的初始器。例如，\ascii{std::set::insert}返回一个\ascii{std::pair}，客户在\ascii{C++17}之前可能使用如下的代码风格。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{插入元素：C++17之前}}]
+std::set<int> nums;
+
+auto result = nums.insert(0);
+if (result->second) {
+  use(*result->first);
+}
+ \end{c++}
+\end{leftbar}
+
+如果使用\ascii{C++17}，代码实现可以更加简单和安全。
+
+\begin{leftbar}
+ \begin{c++}[caption={\ttfamily{插入元素：if初始化器与结构性绑定，C++17}}]
+std::set<int> nums;
+
+if (auto [i, succ] = nums.insert(0); succ) {
+  use(*i);
+}
+ \end{c++}
+\end{leftbar}
+
+\end{content}
+
+\end{story}
+
 \subsection{提取抽象}
 
 通过提取\ascii{TestCase}与\ascii{TestSuite}的共同抽象\ascii{Test}，从而使得用例的组织更加灵活。
@@ -288,6 +535,97 @@ struct Test {
 };
  \end{c++}
 \end{leftbar}
+
+\begin{story}
+  \begin{center}
+    \inlinetitle{抽象的接口类型}
+  \end{center}
+
+\begin{content}
+
+事实上，\cpp{}并没有“接口”这个术语。按照习惯，常常将只包含\ascii{pure virtual}函数的抽象类称为\emph{接口}。这是一个误区，因为\cpp{}是灵活而自由的。\cpp{}的类可以包含\ascii{pure virtual}，或包含具有默认行为的\ascii{virtual}函数，或包含非\ascii{virtual}函数；也可以包含私有成员变量，或包含私有成员函数。一切皆根据具体情况，随机应变。
+
+自由是一把双刃剑。虽然可以给设计带来了弹性，但也极大地提高了普通用户的门槛。接下来，归纳分类常见的几类抽象接口类型。
+
+\subsubsection{函数式接口类型}
+
+这是最简单的，也是最抽象的接口类型。它拥有一个最基本的特征，除虚析构函数之外，有且仅有一个纯虚函数。
+
+\begin{leftbar}
+ \begin{c++}
+struct Description;
+
+struct SelfDescribing {
+  virtual ~SelfDescribing() {}
+  virtual void describeTo(Description& desc) const = 0;
+};
+ \end{c++}
+\end{leftbar}
+
+\subsubsection{纯接口类型：无成员变量}
+
+此类接口类型，实际是函数式接口的一个超集。除虚析构函数之外，它可以拥有一个或多个纯虚函数。
+
+\begin{leftbar}
+ \begin{c++}
+template <typename T>
+struct Matcher : SelfDescribing {
+  virtual bool matches(const T& actual) const = 0;
+  virtual void describeMismatch(const T& actual, Description& desc) const = 0;
+};
+ \end{c++}
+\end{leftbar}
+
+\subsubsection{扩展接口类型：无成员变量}
+
+此类接口类型，是纯接口类型的一个超集。它不仅包含纯虚函数，也包含默认实现的虚函数。甚至，可以提取私有的成员函数。
+
+\begin{leftbar}
+ \begin{c++}
+#include "hamcrest/core/Description.h"
+
+template <typename T>
+struct Matcher : SelfDescribing {
+  virtual bool matches(const T& actual) const = 0;
+
+  virtual void describeMismatch(const T& actual, Description& desc) const {
+    desc.appendText("was ").appendValue(actual);
+  }
+};
+ \end{c++}
+\end{leftbar}
+
+\subsubsection{广义接口类型：存在成员变量}
+
+此类接口类型，是扩展接口类型的一个超集。它可以包含任意类型的成员函数，也包含成员变量。
+
+\begin{leftbar}
+ \begin{c++}
+#include <string>
+
+struct TestResult;
+
+struct Test {
+  explicit Test(const std::string& name = "") : name(name) {
+  }
+
+  const std::string& getName() const {
+    return name;
+  }
+
+  virtual ~Test() {}
+  virtual int countTestCases() const = 0;
+  virtual void run(TestResult&) = 0;
+
+private:
+  std::string name;
+};
+ \end{c++}
+\end{leftbar}
+
+\end{content}
+
+\end{story}
 
 \subsubsection{重构TestCase}
 
