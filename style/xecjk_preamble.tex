@@ -11,8 +11,6 @@
 \usepackage[slantfont, boldfont]{xeCJK} 
 % \usepackage{ctex}
 
-\usepackage[most]{tcolorbox}
-
 %% 针对中文进行断行
 \XeTeXlinebreaklocale "zh"             
 
@@ -29,7 +27,8 @@
 \punctstyle{quanjiao}                                        
                                                      
 %% 设置缺省中文字体
-\setCJKmainfont[BoldFont={Adobe Heiti Std}, ItalicFont={Adobe Kaiti Std}]{Adobe Song Std}   %  FZBaoSongZ04
+\setCJKmainfont[BoldFont={Adobe Heiti Std}, ItalicFont={Adobe Kaiti Std}]{Adobe Song Std}
+% \setCJKmainfont[BoldFont={Adobe Heiti Std}, ItalicFont={Adobe Kaiti Std}]{Adobe Song Std}   %  FZBaoSongZ04
 %% 设置中文无衬线字体
 \setCJKsansfont[BoldFont={Adobe Heiti Std}, ItalicFont={Adobe Kaiti Std}]{Adobe Kaiti Std}  
 %% 设置等宽字体
@@ -58,7 +57,8 @@
 \newfontfamily\optima{Optima}
 \newfontfamily\lucida{Lucida Bright}
 
-\newcommand{\ascii}[1]{{\sffamily #1}}
+\newcommand{\ascii}[1]{{\optima #1}}
+% \newcommand{\ascii}[1]{{\sffamily #1}}
 \newcommand{\speak}[1]{{\itshape #1}}
 \renewcommand{\emph}[1]{{\hei #1}}
 

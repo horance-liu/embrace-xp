@@ -75,6 +75,7 @@ rectangle, rounded corners, inner sep=9pt, inner ysep=20pt]
 \newcommand\refch[1]{\ascii{第\ref{ch:#1}章(\nameref{ch:#1})}}
 \newcommand\refsec[1]{\ascii{\ref{sec:#1}节(\nameref{sec:#1})}}
 
+% \newcommand\eitem[1]{\item {\optima {#1}}}
 \newcommand\eitem[1]{\item {\itshape {#1}}}
 \newcommand\cpp{\ascii{C\nobreak+\nobreak+}}
 \newcommand\clang{\ascii{C}}
@@ -152,6 +153,8 @@ rectangle, rounded corners, inner sep=9pt, inner ysep=20pt]
 %\node[fancytitle, rounded corners] at (box.east) {$\clubsuit$};
 \end{tikzpicture}
 }
+
+\newtcolorbox{episode}[1]{enhanced jigsaw,breakable,pad at break*=1mm,colback=red!5!white, colframe=red!75!black,fonttitle=\bfseries, colbacktitle=red!85!black,enhanced, attach boxed title to top center={yshift=-2mm}, watermark color=white,watermark text=\Roman{tcbbreakpart},title=#1}
 
 \usepackage{enumitem,amssymb}
 \usepackage{pifont}

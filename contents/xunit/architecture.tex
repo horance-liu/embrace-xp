@@ -8,28 +8,6 @@
 
 \begin{content}
 
-\begin{tcolorbox}[enhanced jigsaw,breakable,pad at break*=1mm,
-  colback=red!5!white,colframe=red!75!black,fonttitle=\bfseries,
-  colbacktitle=red!75!black,enhanced, attach boxed title to top center={yshift=-2mm},
-  title=架构之美架构之美架构之美架构之美架构之美， Hello, World,
-  watermark color=white,watermark text=\Roman{tcbbreakpart}]
-
-\begin{content}
-
-决定选数学作为minor，从这个学期开始会上一系列的数学课。这个学期选的是Real and Functional Analysis，这门课已经进入尾声，下周就要考试了。
- 
-这门课主要讲的是测度论和勒贝格积分理论，以及一些基础的泛函分析，这些内容自己以前也自学过，不过经过一个学期的学习，还是觉得有不少新的收获。
- 
-由于老师讲课没有依据特定的教材（这似乎是MIT的风格，我在这上的所有课都没有特定教材的），而且连lecture notes都没有。我的做法是在堂上记下笔记，然后每周都抽出时间把笔记用Latex整理成Notes。事实上，这些整理出来的Notes我在整理完后已经不太需要看了，真正发挥作用的是这个整理的过程，它对于知识的吸收起到了很重要的作用。
- 
-一方面，老师上课比较“即兴”，讲的时候很多东西都是穿插着讲的，并不依循一个特定的逻辑顺序，所以在整理的过程中，就需要充分理解上课所讲的材料，理清它们的关系，然后重新归纳出一个合乎逻辑的顺序。另一方面，由于时间很紧张，很多定理和命题，老师都没有给出证明，这些证明我都在整理笔记的过程中自己独立完成了。回头看来，这个过程其实使自己受到了一个充分的数学训练——相当于把整个体系从头到尾推导了一遍。很多概念，定理，以及它们的关系，在这个过程中被充分消化了。
-
-
-
-\end{content}
-
-\end{tcolorbox}
-
 本书通过使用\cpp{}设计和实现\ascii{xUnit}框架，透视极限编程在\cpp{}社区中的具体实践与运用，包括\ascii{简单设计}，\ascii{TDD}、重构；也会深入体会正交设计、设计原则、设计模式、整洁代码、实现模式与习惯用法在编程实践中的具体运用；也会在面向对象、函数式、泛型编程不同编程范式之间切换自如；也会尝试\ascii{DSL}设计与实现，体会代码之美，设计之美，架构之美。
 
 \end{content}
@@ -182,9 +160,9 @@ protected:
 假定预开发的系统名为\ascii{xUnit Mars}，它完成类似\ascii{Google Test}的功能特性。相对于\ascii{Google Test}，\ascii{xUnit Mars}定义了一套无歧义的\ascii{DSL}，改善了用例描述的表达力，包括如下几个方面。
 
 \begin{enum}
-  \eitem{\ascii{使用字符串描述用例，改善用例的表达力；}}
-  \eitem{\ascii{在同一个类域内，使得TEST与SETUP/TEARDOWN关系更加紧密；}}
-  \eitem{\ascii{避免setup/setUp/SetUp大小写混用而引发错误。}}
+  \eitem{使用字符串描述用例，改善用例的表达力；}
+  \eitem{在同一个类域内，使得TEST与SETUP/TEARDOWN关系更加紧密；}
+  \eitem{避免setup/setUp/SetUp大小写混用而引发错误。}
 \end{enum}
 
 \begin{leftbar}

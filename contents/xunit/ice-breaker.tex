@@ -149,10 +149,7 @@ TEST(SimpleTest, make_sure_test_case_can_run_normally) {
  \end{c++}
 \end{leftbar}
 
-\begin{story}
-  \begin{center}
-    \inlinetitle{TDD: 测试驱动开发}
-  \end{center}
+\begin{episode}{TDD: 测试驱动开发}
 
 \begin{content}
 
@@ -167,7 +164,7 @@ TEST(SimpleTest, make_sure_test_case_can_run_normally) {
 
 \end{content}
 
-\end{story}
+\end{episode}
 
 \subsection{通过编译}
 
@@ -187,10 +184,8 @@ struct TestCase {
   \end{c++}
 \end{leftbar}
 
-\begin{story}
-  \begin{center}
-    \inlinetitle{头文件保护宏}
-  \end{center}
+
+\begin{episode}{头文件保护宏}
 
 \begin{content}
 
@@ -218,14 +213,11 @@ formatter_settings_version=1
 
 \end{content}
 
-\end{story}
+\end{episode}
 
 需要重点关注的是，\ascii{TestCase}显式地声明了虚拟的析构函数。如果不经意地遗忘声明该析构函数为虚拟的，则可能招致运行时不确定的行为发生。
 
-\begin{story}
-  \begin{center}
-    \inlinetitle{析构函数：虚拟 VS. 非虚}
-  \end{center}
+\begin{episode}{析构函数：虚拟 VS. 非虚}
 
 \begin{content}
 
@@ -281,7 +273,7 @@ private:
 
 \end{content}
 
-\end{story}
+\end{episode}
 
 \subsection{通过链接}
 
@@ -293,10 +285,8 @@ private:
  \end{c++}
 \end{leftbar}
 
-\begin{story}
-  \begin{center}
-    \inlinetitle{多屏编辑}
-  \end{center}
+
+\begin{episode}{多屏编辑}
 
 \begin{content}
 
@@ -315,7 +305,7 @@ private:
 
 \end{content}
 
-\end{story}
+\end{episode}
 
 \subsection{通过测试}
 
