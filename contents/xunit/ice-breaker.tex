@@ -17,7 +17,7 @@
 \subsection{系统配置}
 
 \begin{table}[!htb]
-\resizebox{0.8\textwidth}{!} {
+\resizebox{1.0\textwidth}{!} {
 \begin{tabular*}{1.2\textwidth}{@{}ll@{}}
 \toprule
 \ascii{环境} & \ascii{配置与版本} \\
@@ -27,12 +27,41 @@
 \ascii{编程语言} & \ascii{C++14} \\ 
 \ascii{构建工具} & \ascii{CMake 3.10, Make 4.1} \\ 
 \ascii{集成开发环境} & \ascii{Eclipse CDT Oxygen.3} \\ 
+\ascii{版本工具} & \ascii{Git 2.17.1} \\ 
 \bottomrule
 \end{tabular*}
 }
 \caption{环境配置}
 \label{tbl:env-configure}
 \end{table}
+
+\begin{episode}{代码风格}
+
+\begin{content}
+
+倡导团队成员遵循\ascii{XP}基本的价值观，致力于优秀的软件设计。系统中所有的代码看起来就好像是由单独一个值得胜任的人编写的，遵循一致的、统一的的代码风格。可以配置\ascii{Eclipse CDT}主题风格和代码模板，团队导入相同的代码模板，使其得到一致的代码风格。
+
+业界存在多种经典的代码风格，团队应该选择并保持其中一种代码风格。
+
+\begin{enum}
+  \eitem{\code{K\&R}}
+  \eitem{\code{BSD/Allman}}
+  \eitem{\code{GNU}}
+  \eitem{\code{Whitesmiths}}
+\end{enum}
+
+本书使用\ascii{K\&R}的代码风格，但在对齐方面做了细微处理，如\refig{eclipse-formatter}所示。配置完毕之后，当需要排版代码时，使用快捷键\ascii{Ctrl + Shift + F}便立马得到漂亮的、一致的代码风格。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=1.0\textwidth]{figures/xunit/eclipse-formatter.png}
+\caption{代码风格: K\&R}
+ \label{fig:eclipse-formatter}
+\end{figure}
+
+\end{content}
+
+\end{episode}
 
 \subsection{项目组织}
 
@@ -153,14 +182,75 @@ TEST(SimpleTest, make_sure_test_case_can_run_normally) {
 
 \begin{content}
 
-\ascii{TDD}是极限编程中重要的技术实践之一。\ascii{TDD}遵循小步快走，测试先行的基本方法论，每轮迭代依次执行\ascii{“Red-Green-Refactor”}；每轮迭代之后，系统都处于一个相对合理的状态，如\refig{tdd-cycle}所示。
+\ascii{TDD}是极限编程中重要的技术实践之一。在\ascii{TDD}实践过程中，信心指数应该是平滑的。如果步子迈得过大，则恢复测试时间间隔会变长，信心指数则会下降。把握住\ascii{TDD}动态变化过程，做到收放自如，需要长期的编程实践，让“小”成为工作中的一种习惯。
+
+\subsubsection{TDD闭环}
+
+\ascii{TDD}遵循小步快走，测试先行的基本方法论，每轮迭代依次执行\ascii{“Red-Green-Refactor”}。每轮迭代之后，系统都处于一个相对合理的状态，如\refig{tdd-cycle}所示。
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.8\textwidth]{figures/xunit/tdd_cycle.png}
-\caption{TDD环}
+\includegraphics[width=0.8\textwidth]{figures/xunit/tdd-cycle.png}
+\caption{TDD: 测试驱动开发}
  \label{fig:tdd-cycle}
 \end{figure}
+
+\subsubsection{TDD实现方法}
+
+极限编程之父\ascii{Kent Beck}在经典的\ascii{Test-Driven Development by Example}书中，介绍了三种基本的实现方法。
+
+\begin{enum}
+  \eitem{伪实现}
+  \eitem{三角法}
+  \eitem{显式实现}
+\end{enum}
+
+使用硬编码，伪装通过测试是一种最快速、最简单的实现方法。一旦通过测试，然后通过重构消除重复，以期待消除所有硬编码；或使用三角法，添加新的测试用例，驱动真实实现。
+
+除非问题看起来并没有想象中那么简单，采取保守的策略也是恰当的。如果实现显而易见，完全可以绕开保守的\emph{伪实现}与\emph{三角法}。而在实际操作中，通过测试往往都比较简单，显式实现也是最常见的做法。在这种情况下，大可快速前进，不用处处敬小慎微。
+
+\subsubsection{尽快变绿}
+
+三种实现方法常常交替使用，虽然实现迥异，但殊途同归：以最小的努力，在最短的时间，通过测试，尽快变绿。实现过程中，尽量不要引入过度复杂的实现。例如，引入某种设计模式，重构既有的代码。
+
+务必克服心中的恶魔，需要充分衡量成本收益比。如果引入设计较为笨重，通过测试遥遥无期，则应立即放弃；而如果引入设计显而易见，实施起来也比较容易操作，并带来一定设计的弹性，且不影响通过测试的整体进度，则可以接受。
+
+\subsubsection{重构成为习惯}
+
+一旦测试通过，务必重构既有的实现，让设计保持在目前最合理的状态。此刻，也需要克服心中的恶魔，不能做过度的设计。如果没有测试用例表达某个事件发生，则不要凭空臆想未来的世界会发生什么事情。
+
+\subsubsection{出错后放慢脚步}
+
+在最坏的情况下，测试在一段时间内尝试修复都以失败告终，则需要使用\ascii{Git}回退所有代码，使用更保守的\emph{伪实现}与\emph{三角法}，尽快修复测试。
+
+\subsubsection{TDD实现原则}
+
+\ascii{Bob}大叔在其著作\ascii{Clean Code}中阐述了实践\ascii{TDD}的三个基本原则。
+
+\begin{enum}
+  \eitem{在编写不能通过的测试前，不可编写生产代码；}
+  \eitem{只可编写刚好无法通过的测试，不能编译也算不通过；}
+  \eitem{只可编写刚好足以通过当前失败测试的生产代码。}
+\end{enum}
+
+理解起来比较绕口，换一个等价的、较易理解的方式，可以表述为：
+
+\begin{enum}
+  \eitem{测试先行；}
+  \eitem{测试失败；}
+  \eitem{尽快变绿。}
+\end{enum}
+
+\subsubsection{TDD实现技巧}
+
+实践\ascii{TDD}时，常需要规划和维护一个\ascii{TODO List}。将熟悉的，价值大，容易实现，实现基本功能的测试用例优先实现；而将不熟悉，价值小，不易实现，异常边界的测试用例依次排到后面，留待后续处理。
+
+\begin{enum}
+  \eitem{基本功能与异常场景；}  
+  \eitem{高价值与现成果实；}
+  \eitem{确定与不确定；}
+  \eitem{整体优先与细节优先。}
+\end{enum}
 
 \end{content}
 
@@ -184,30 +274,36 @@ struct TestCase {
   \end{c++}
 \end{leftbar}
 
-
 \begin{episode}{头文件保护宏}
 
 \begin{content}
 
-\ascii{C/C++}的编译模型通过使用\ascii{include}语句载入头文件，为了避免头文件被载入多次，每一个头文件都应该定义独一无二的头文件保护宏，社区存在两种风格：
+\ascii{C/C++}的编译模型通过使用\ascii{include}语句载入头文件，为了避免头文件被载入多次，每一个头文件都应该定义独一无二的头文件保护宏。社区存在两种风格：
 
 \begin{enum}
   \eitem{\code{INCL\_<PROJECT>\_<MODULE>\_<FILE>\_H}}
-  \eitem{\ascii{UUID}}
+  \eitem{\code{UUID}}
 \end{enum}
 
-第一种命名风格问题在于：当头文件被重命名或移动目录时，为了保持一致性需要同步修改头文件保护宏，而此特性\ascii{IDE}通常支持都不是太良好。因此，推荐使用\ascii{IDE}自动地随机生成\ascii{UUID}，其更加快捷、简单、并且安全、有效。
+第一种命名风格问题在于：当头文件被重命名或移动目录时，为了保持一致性需要同步修改头文件保护宏，而此特性\ascii{IDE}通常支持都不是太良好。因此，推荐随机生成\ascii{UUID}，其更加快捷、简单、并且安全、有效。
 
-其中，\ascii{Eclipse CDT}使用代码模板，并执行如下配置，创建头文件时自动生成\ascii{UUID}的头文件保护宏。
+首先，配置\ascii{Eclipse CDT}的代码模板。当创建头文件时，自动生成头文件保护宏。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{头文件保护宏：配置Eclipse CDT生成UUID}}]
-$ vi .settings/org.eclipse.cdt.ui.prefs
-codetemplates.includeGuardGenerationScheme=1    
-eclipse.preferences.version=1
-formatter_settings_version=1
- \end{c++}
-\end{leftbar}
+\begin{figure}[H]
+\centering
+\includegraphics[width=1.0\textwidth]{figures/xunit/eclipse-code-template.png}
+\caption{Eclipse CDT: 代码模板}
+ \label{fig:eclipse-code-template}
+\end{figure}
+
+然后，配置头文件保护宏使用\ascii{UUID}自动生成。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=1.0\textwidth]{figures/xunit/eclipse-include-guard.png}
+\caption{Eclipse CDT: 生成UUID的头文件保护宏}
+ \label{fig:eclipse-include-guard}
+\end{figure}
 
 为了缩短篇幅，后文略去所有头文件保护符。
 
@@ -215,18 +311,19 @@ formatter_settings_version=1
 
 \end{episode}
 
-需要重点关注的是，\ascii{TestCase}显式地声明了虚拟的析构函数。如果不经意地遗忘声明该析构函数为虚拟的，则可能招致运行时不确定的行为发生。
+需要关注的是，\ascii{TestCase}实现了一个虚拟析构函数。如果不经意地遗忘声明该析构函数为虚拟的\footnote{默认生成的析构函数是非虚拟的。}，则可能招致运行时不确定的行为发生。
 
-\begin{episode}{析构函数：虚拟 VS. 非虚}
+\begin{episode}{虚拟析构函数}
 
 \begin{content}
 
-\subsubsection{虚拟析构函数}
+一般地，需要为\emph{多态基类}声明虚拟析构函数；否则，会招致运行时不可预期的行为。一般地，如果一个类包含虚函数时，便将其析构函数声明为虚拟的。
 
-一般地，需要为虚拟的、多态基类声明虚拟析构函数。否则，会招致运行时不可预期的行为。一般地，如果一个类包含虚函数时，便将其析构函数声明为\ascii{virtual}。但是，为每个接口类型实现一个空的虚拟析构函数，显得重复而且麻烦。可以引入一个宏定义，自动引入控实现的虚拟析构函数。
+\subsubsection{空实现}
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{include/mars/core/Test.h}}]
+但是，为每个接口类型实现一个空的虚拟析构函数，显得重复而且麻烦。可以引入一个宏定义，自动引入空实现的虚拟析构函数。
+
+ \begin{c++}
 namespace details {
   template<typename T>
   struct Trait {
@@ -237,11 +334,9 @@ namespace details {
 #define TRAIT(trait)  struct trait : ::details::Trait<trait>
 #define EXTENDS(...) , ##__VA_ARGS__
  \end{c++}
-\end{leftbar}
 
-例如，\ascii{SelfDescribing}接口使用该宏定义，自动拥有虚拟析构函数的默认空实现。
+例如，使用\ascii{TRAIT}宏，定义了一个接口类型\ascii{SelfDescribing}，它自动拥有虚拟析构函数的默认空实现。
 
-\begin{leftbar}
  \begin{c++}
 struct Description;
 
@@ -249,27 +344,24 @@ TRAIT(SelfDescribing) {
   virtual void describeTo(Description& desc) const = 0;
 };
  \end{c++}
-\end{leftbar}
 
-\subsubsection{非虚拟析构函数}
+\subsubsection{抽象函数}
 
-如果一个类，显式或隐式地声明了\ascii{public}非虚拟析构函数，则该类不被用于多态，也不能被用于继承。此时，显式声明为\ascii{final}，有助于改善编译时的安全性，及其为编译器的优化提供更多的线索。例如，不可变类\ascii{Integer}声明为\ascii{final}，明确地对外声明不能被继承。
+此外，定义纯虚函数时，常常遗忘了后面的\ascii{0}。可以引入另外一个宏定义。
 
-\begin{leftbar}
  \begin{c++}
-final struct Integer {
-  explicit Integer(int value);
-
-  std::string toString() const;
-  std::string toOctalString() const;
-  std::string toHexString() const;  
-  std::string toBinaryString() const;    
-
-private:
-  int value;
-};
+#define ABSTRACT(...) virtual __VA_ARGS__ = 0
  \end{c++}
-\end{leftbar}
+
+使用\ascii{ABSTRACT}定义，不仅可以抑制不经意地遗漏\ascii{0}的错误，也可以改善\ascii{API}的意图和可读性。
+
+\begin{c++}
+struct Description;
+
+TRAIT(SelfDescribing) {
+  ABSTRACT(void describeTo(Description& desc) const);
+};
+\end{c++}
 
 \end{content}
 
@@ -339,10 +431,8 @@ Running main() from gtest_main.cc
 \end{leftbar}
 
 
-\begin{story}
-  \begin{center}
-    \inlinetitle{全局忽略模式}
-  \end{center}
+
+\begin{episode}{全局忽略模式}
 
 \begin{content}
 
@@ -350,7 +440,6 @@ Running main() from gtest_main.cc
 
 但是，为每个项目都创建一个\ascii{.gitignore}文件，显然是一种重复设计。因此，配置全局忽略模式是一个更恰当的解决方案。例如，在我的系统中配置如下。
 
-\begin{leftbar}
  \begin{c++}[caption={\ttfamily{Git：配置全局忽略模式}}]
 $ git config --global core.excludesfile ~/.gitignore_global
 $ vi ~/.gitignore_global
@@ -368,11 +457,9 @@ build/
 # tex
 output/
  \end{c++}
-\end{leftbar}
 
 \end{content}
-
-\end{story}
+\end{episode}
 
 \subsection{提交代码}
 
@@ -385,29 +472,30 @@ $ git commit -m"pass first test case"
  \end{c++}
 \end{leftbar}
 
-\begin{story}
-  \begin{center}
-    \inlinetitle{后悔药}
-  \end{center}
+\begin{episode}{后悔药}
 
 \begin{content}
 
 感谢\ascii{Linus}创造了\ascii{Linux}与\ascii{Git}，让全世界的程序员得以享受编程的快乐。\ascii{TDD}精髓之一便是“小”，配合运用\ascii{Git}，简直就是完美，避免不经意的错误而丢失代码。
 
-养成经常性提交代码至\ascii{Git}库，是一种良好的编程习惯。在\ascii{TDD}的一个迭代循环中，每当编译通过，链接通过，测试通过，完成重构等关键环节，都立即执行\ascii{git add}。当设计重构至相对合理状态，执行\ascii{git commit}入库。在任何时刻，都可回溯至上一个稳定的状态。如\refig{tdd-git}所示。
+养成经常性提交代码至\ascii{Git}库，是一种良好的编程习惯。在\ascii{TDD}的一个迭代循环中，每当编译通过，链接通过，测试通过，关键重构成功，都应立即执行\ascii{git add}。当设计重构至相对合理状态，最后执行\ascii{git commit}入库，完成一次\ascii{TDD}的闭环。
 
-借助于\ascii{Git}，随时可以吃后悔药。当尝试某种重构设计时，没有达到预期效果，则可以轻松回到上一个稳定状态，开始尝试新的努力。
+此外，借助于\ascii{Git}，随时可以吃后悔药。当尝试某种重构设计时，没有达到预期效果，则可以轻松回到上一个稳定状态，重新开始尝试新的努力。
 
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.6\textwidth]{figures/xunit/tdd-git.png}
-\caption{TDD环: 关键环节提交代码}
- \label{fig:tdd-git}
-\end{figure}
+以“重命名函数”的重构过程为例，讲述\ascii{Git}的操作。
+
+\begin{enum}
+  \eitem{新建一个函数；}
+  \eitem{拷贝旧函数的实现至新函数；}
+  \eitem{确保编译、测试通过，执行\code{git add}；}  
+  \eitem{删除旧函数的实现逻辑，转调新函数；}
+  \eitem{确保编译、测试通过，执行\code{git add}；}
+  \eitem{对于每个引用旧函数的地方，重构引用新函数，确保编译、测试通过，执行\code{git add}；}    
+  \eitem{删除旧函数，确保编译、测试通过，执行\code{git commit}。}      
+\end{enum}
 
 \end{content}
-
-\end{story}
+\end{episode}
 
 \end{content}
 
