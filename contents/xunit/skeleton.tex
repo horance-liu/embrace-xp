@@ -18,8 +18,56 @@
 
 \subsection{测试用例}
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{test/mars/core/TestCaseSpec.cc}}]
+\begin{diff}{test/mars/core/TestCaseSpec.cc}
+ \begin{c++}
+#include <gtest/gtest.h>
+#include "mars/core/TestCase.h"
+
+namespace {
+  struct SimpleTest : TestCase {
+    bool wasRun = false;
+
+  private:
+    void run() override {
+      wasRun = true;
+    }
+  };
+
+  void run(TestCase& test) {
+    test.run();
+  }
+}
+
+TEST(SimpleTest, make_sure_test_case_can_run_normally) {
+  SimpleTest test;
+  run(test);
+
+  ASSERT_TRUE(test.wasRun);
+}
+
+TEST(SimpleTest, make_sure_test_case_can_run_normally) {
+  SimpleTest test;
+  run(test);
+
+  ASSERT_TRUE(test.wasRun);
+}
+
+TEST(SimpleTest, make_sure_test_case_can_run_normally) {
+  SimpleTest test;
+  run(test);
+
+  ASSERT_TRUE(test.wasRun);
+}
+
+TEST(SimpleTest, make_sure_test_case_can_run_normally) {
+  SimpleTest test;
+  run(test);
+
+  ASSERT_TRUE(test.wasRun);
+}
+ \end{c++}
+\tcblower
+ \begin{c++}
 #include <gtest/gtest.h>
 #include "mars/core/TestCase.h"
 
@@ -46,8 +94,8 @@ TEST(SimpleTest, make_sure_test_case_can_run_normally) {
   ASSERT_TRUE(test.wasSetUp);
   ASSERT_TRUE(test.wasRun);
 }
- \end{c++}
-\end{leftbar}
+ \end{c++} 
+\end{diff}
 
 被覆写的\ascii{SimpleTest::setUp, SimpleTest::runTest}成员函数被显式声明为\ascii{override}与\ascii{private}。前者在编译时完成函数签名的合法性检查，后者限制外部用户使用\ascii{SimpleTest}对象直接调用\ascii{setUp, runTest}成员函数。
 
@@ -62,7 +110,7 @@ TEST(SimpleTest, make_sure_test_case_can_run_normally) {
 
 \subsubsection{例外}
 
-凡事都存在例外，被覆写的析构函数就不应该声明为\ascii{private}；否则，无法生成该类型的值对象，否则该值对象没办法被析构。
+凡事都存在例外，被覆写的析构函数就不应该声明为\ascii{private}；否则，无法生成该类型的值对象，因为没办法析构。
 
 \end{content}
 \end{episode}

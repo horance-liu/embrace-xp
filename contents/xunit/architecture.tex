@@ -16,20 +16,20 @@
 
 \begin{content}
 
-\ascii{xUnit}表示一组单元测试框架集合，其基本架构思想起源于\ascii{SUnit}。\ascii{SUnit}由极限编程之父\ascii{Kent Beck}使用\ascii{SmallTalk}设计实现；随后，\ascii{Kent Beck}与\ascii{Erich Gamma}结对编程，移植实现了\ascii{Java}版本\ascii{JUnit}。
+\ascii{xUnit}表示一组单元测试框架集合，其基本思想起源于\ascii{SUnit}。\ascii{SUnit}由极限编程之父\ascii{Kent Beck}使用\ascii{SmallTalk}设计实现。随后，\ascii{Kent Beck}与\ascii{Erich Gamma}结对编程，移植实现了\ascii{Java}版本\ascii{JUnit}。
 
-\ascii{JUnit}随着\ascii{Java}社区不断壮大，及其敏捷软件开发思潮的涌现，\ascii{JUnit}当前成为\ascii{Java}程序员最常使用的框架之一。目前，\ascii{JUnit}也在不对进化与演进，截止目前\ascii{JUnit5}也在完善与开发之中。
+\ascii{JUnit}随着\ascii{Java}社区不断壮大，及其敏捷软件开发思潮的涌现，当前\ascii{JUnit}已经成为\ascii{Java}程序员最常使用的框架之一。而且\ascii{JUnit}也在不断地进化与演进，截止目前\ascii{JUnit5}已然面世，焕发青春。
 
-随之，各种编程语言社区都诞生了各种优秀的\ascii{xUnit}实现，包括基于\ascii{JVM}实现的高级编程语言系列。但是，它们都没有逃离\ascii{xUnit}基本框架和思维模式，唯有部分后起之秀在用户界面友好性方面取得极大的改进和提升。
+随之，各家语言社区都诞生了自家优秀的\ascii{xUnit}实现，包括基于\ascii{JVM}实现的各种高级编程语言。但是，它们都基本继承或发扬了\ascii{xUnit}基本架构与方法论，而且部分后起之秀在用户界面友好性方面取得极大的改进和提升。例如，我所偏爱的\ascii{Spock, ScalaTest}。
 
-一则，归功于编程语言的内在特性，因为有的编程语言天然地支持\ascii{DSL}的构建；二则，归功于同门竞争，例如，基于\cpp{}语言实现的\ascii{xUnit}在社区中就存在众多实现，而且在不断演进和革新。
+一方面，归功于编程语言的内在特性，因为部分编程语言天然地支持\ascii{DSL}构建。另一方面，归功于该领域发展的成熟度与良好的竞争环境。例如，基于\cpp{}语言实现的\ascii{xUnit}在社区中就存在众多实现，而且在不断演进和革新。
 
 \subsection{Google Test}
 
-\ascii{Google Test}出自名家，自带光环。其功能强大，系统稳定，移植性良好，支持用例自动发现机制，相对于社区其他\ascii{xUnit}框架更显技高一筹，在\ascii{C++}社区占据主导地位。但是，\ascii{Google Test}也存在一些不尽人意的细节之处。
+\ascii{Google Test}出自名家，自带光环。其功能强大，系统稳定，移植性良好，支持用例自动发现机制，相对于社区其它\ascii{xUnit}框架更显技高一筹，在\ascii{C++}社区占据主导地位。但是，\ascii{Google Test}也存在一些不尽人意的细节之处。
 
 \begin{leftbar}
- \begin{c++}
+ \begin{c++}[caption={\ttfamily{Google Test样例}}]
 #include <gtest/gtest.h>
 #include <stack>
 
@@ -70,8 +70,9 @@ TEST_F(StackSpec, apply_pop_2_time) {
 当用例命名成为程序员的一种负担，其质量将大大折扣。但是，测试用例是系统行为描述最重要的活“文档”，它与被测系统的代码一并入库，并保持同步。如果，测试用例命名质量不高，\ascii{"Test as Document"}的愿景只能沦为痴人说梦了。
 
 \begin{leftbar}
- \begin{c++}
-TEST_F(RobotCleanerTest, at_the_beginning_the_robot_should_be_in_at_the_initial_position) {
+ \begin{c++}[caption={\ttfamily{坏味道：使用标识符命名用例}}]
+// Bad Smell: test name .
+TEST_F(RobotCleanerTest, at_beginning_the_robot_should_be_in_at_the_initial_position) {
   ASSERT_EQ(Position(0, 0, NORTH), robot.getPosition());
 }
  \end{c++}
@@ -79,20 +80,24 @@ TEST_F(RobotCleanerTest, at_the_beginning_the_robot_should_be_in_at_the_initial_
 
 \subsubsection{重复}
 
-\ascii{RobotCleanerTest}扮演\ascii{Fixure}的职责，但与每个\ascii{TEST\_F}分离实现，每个用例都要重复一次\ascii{RobotCleanerTest}，程序员只能接受“拷贝-粘贴”，别无选择。
+\ascii{RobotCleanerTest}扮演\emph{测试装置}，但与每个测试用例(\ascii{TEST\_F})分离实现，每个用例不得不一次次地重复\ascii{RobotCleanerTest}。
+
+测试装置与测试用例相分离，破坏了它们之间的内聚性。当然，\ascii{C++}程序员已然习惯类定义与成员函数定义相分离的思维模式，习惯性接受这样的重复设计。但是，这两种场景存在微妙的差异。
+
+一般地，在\cpp{}编译模型中，头文件中定义类，实现文件中定义成员函数。但是，此处测试装置与测试用例已经在同一个文件内，分离定义而导致重复引入\ascii{RobotCleanerTest}，显然给用户增加无畏的负担。
 
 \begin{leftbar}
- \begin{c++}
+ \begin{c++}[caption={\ttfamily{缺乏内聚：测试装置与测试用例相分离，重复设计}}]
 struct RobotCleanerTest : testing::Test {
 protected:
   RobotCleaner robot;
 };
  
-TEST_F(RobotCleanerTest, at_the_beginning_the_robot_should_be_in_at_the_initial_position) {
+TEST_F(RobotCleanerTest, at_beginning_the_robot_should_be_in_at_the_initial_position) {
   ASSERT_EQ(Position(0, 0, NORTH), robot.getPosition());
 }
  
-TEST_F(RobotCleanerTest, should_be_face_west_after_turn_left) {
+TEST_F(RobotCleanerTest, robot_should_be_face_west_after_turn_left) {
   robot.turnLeft();
   ASSERT_EQ(Position(0, 0, WEST), robot.getPosition());
 }
@@ -101,18 +106,18 @@ TEST_F(RobotCleanerTest, should_be_face_west_after_turn_left) {
 
 \subsubsection{隐晦}
 
-\ascii{RobotCleanerTest}与\ascii{TEST\_F}分离实现，本应该被直观理解为类与成员函数之间的关系。理论上，\ascii{TEST\_F}能够直接获取到私有成员，例如\ascii{RobotCleanerTest::robot}。
+测试装置与测试用例相分离，本应该被直观地理解为类与成员函数之间的关系。也就是说，\ascii{TEST\_F}理论上能够直接获取到私有成员\ascii{RobotCleanerTest::robot}。
 
 不幸的是，\ascii{RobotCleanerTest}与\ascii{TEST\_F}存在隐晦的继承关系。如果用户不了解\ascii{Google Test}的实现机制，就根本无法理解成员变量\ascii{RobotCleanerTest::robot}为什么是\ascii{protected}，而不是\ascii{private}。
 
 \begin{leftbar}
- \begin{c++}
+ \begin{c++}[caption={\ttfamily{错误：本应该使用protected，而错误地使用private}}]
 struct RobotCleanerTest : testing::Test {
-private:  // should be protected
+private:  // Error: should be protected
   RobotCleaner robot;
 };
  
-TEST_F(RobotCleanerTest, at_the_beginning_the_robot_should_be_in_at_the_initial_position) {
+TEST_F(RobotCleanerTest, at_beginning_the_robot_should_be_in_at_the_initial_position) {
   ASSERT_EQ(Position(0, 0, NORTH), robot.getPosition());
 }
   \end{c++}
@@ -123,14 +128,14 @@ TEST_F(RobotCleanerTest, at_the_beginning_the_robot_should_be_in_at_the_initial_
 用户也需要关注\ascii{TEST， TEST\_F}之间的区别，及其使用场景，无疑增加了用户的心智包袱。例如，用户在此处本应使用\ascii{TEST\_F}，而误用为\ascii{TEST}。这个例子较为幸运，编译器提示\ascii{robot}变量未定义。但是，在特殊场景可能会逃出编译时检查，导致运行时用例失败。
 
 \begin{leftbar}
- \begin{c++}
+ \begin{c++}[caption={\ttfamily{错误：本应该使用TEST\_F，而错误地使用TEST}}]
 struct RobotCleanerTest : testing::Test {
 protected:
   RobotCleaner robot;
 };
 
-// should be TEST\_F
-TEST(RobotCleanerTest, at_the_beginning_the_robot_should_be_in_at_the_initial_position) {
+// Error: should be TEST\_F
+TEST(RobotCleanerTest, at_beginning_the_robot_should_be_in_at_the_initial_position) {
   ASSERT_EQ(Position(0, 0, NORTH), robot.getPosition());
 }
   \end{c++}
@@ -138,14 +143,14 @@ TEST(RobotCleanerTest, at_the_beginning_the_robot_should_be_in_at_the_initial_po
 
 \subsubsection{大小写}
 
-覆写\ascii{Test::SetUp}时，经常将其错误地写为\ascii{setup, setUp, Setup}，不经意地大小写错误导致运行时测试失败。当然，如果坚持使用\ascii{override}关键字提高编译时的安全性，可以将错误拦截至编译期。
+覆写\ascii{Test::SetUp}时，经常将其错误地写为\ascii{setup, setUp, Setup}，不经意地大小写错误可能导致运行时测试用例执行失败。当然，如果坚持使用\ascii{override}关键字，可以提高编译时安全性，将错误拦截至编译期。
 
 \begin{leftbar}
- \begin{c++}
+ \begin{c++}[caption={\ttfamily{错误：本应该声明为SetUp，而错误地声明为Setup}}]
 struct RobotCleanerTest : testing::Test {
 private:
-  // should be override
-  virtual void Setup() {
+  // Error: should be SetUp
+  void Setup() {
     robot.reset();
   }
  
@@ -157,16 +162,16 @@ protected:
 
 \subsection{xUnit Mars}
 
-假定预开发的系统名为\ascii{xUnit Mars}，它完成类似\ascii{Google Test}的功能特性。相对于\ascii{Google Test}，\ascii{xUnit Mars}定义了一套无歧义的\ascii{DSL}，改善了用例描述的表达力，包括如下几个方面。
+假定预开发的系统名为\ascii{xUnit Mars}，它完成类似\ascii{Google Test}的功能特性。相对于\ascii{Google Test}，\ascii{xUnit Mars}定义了一套更人性化的\ascii{DSL}，改善了用例描述的表达力。
 
 \begin{enum}
   \eitem{使用字符串描述用例，改善用例的表达力；}
-  \eitem{在同一个类域内，使得TEST与SETUP/TEARDOWN关系更加紧密；}
-  \eitem{避免setup/setUp/SetUp大小写混用而引发错误。}
+  \eitem{在同一个类域内，使得测试用例与测试装置之间的关系更加内聚；}
+  \eitem{避免\code{setup/setUp/SetUp}大小写混用而引发错误。}
 \end{enum}
 
 \begin{leftbar}
- \begin{c++}
+ \begin{c++}[caption={\ttfamily{xUnit Mars样例}}]
 #include <mars/mars.h>
 #include <stack>
 

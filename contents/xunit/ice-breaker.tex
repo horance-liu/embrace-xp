@@ -39,9 +39,9 @@
 
 \begin{content}
 
-倡导团队成员遵循\ascii{XP}基本的价值观，致力于优秀的软件设计。系统中所有的代码看起来就好像是由单独一个值得胜任的人编写的，遵循一致的、统一的的代码风格。可以配置\ascii{Eclipse CDT}主题风格和代码模板，团队导入相同的代码模板，使其得到一致的代码风格。
+\emph{团队成员遵循\ascii{XP}基本价值观，致力于优秀的软件设计。}系统中所有的代码看起来就好像是由单独一个值得胜任的人编写的，并遵循一致的、统一的的代码风格。
 
-业界存在多种经典的代码风格，团队应该选择并保持其中一种代码风格。
+可以配置\ascii{Eclipse CDT}代码模板，团队通过导入代码模板，使其得到一致的代码风格。业界存在多种经典的代码风格，团队应该选择并保持其中一种代码风格。
 
 \begin{enum}
   \eitem{\code{K\&R}}
@@ -50,7 +50,11 @@
   \eitem{\code{Whitesmiths}}
 \end{enum}
 
-本书使用\ascii{K\&R}的代码风格，但在对齐方面做了细微处理，如\refig{eclipse-formatter}所示。配置完毕之后，当需要排版代码时，使用快捷键\ascii{Ctrl + Shift + F}便立马得到漂亮的、一致的代码风格。
+本书使用\ascii{K\&R}的代码风格，但在对齐方面做了细微调整，如\refig{eclipse-formatter}所示。配置完毕之后，便可以充分享受神奇带来的快感。
+
+例如，创建头文件时，自动生成\ascii{UUID}的头文件保护宏，彻底抛弃这个遗留问题；当需要排版代码时，使用快捷键\ascii{Ctrl + Shift + F}立马得到漂亮的代码风格。
+
+关于\ascii{Eclipse CDT}详细配置与使用技巧，推荐阅读王博\footnote{\href{https://www.jianshu.com/u/92b7d9879f20}{\ascii{https://www.jianshu.com/u/92b7d9879f20}}}在简书上的三篇博文：\href{https://www.jianshu.com/p/dafcdce1f9cb}{\ascii{Effective Eclipse CDT}}。
 
 \begin{figure}[H]
 \centering
@@ -65,23 +69,14 @@
 
 \subsection{项目组织}
 
-\ascii{xUnit Mars}项目物理目录结构如下所示。
+\ascii{xUnit Mars}项目目录结构如\refig{mars-project}所示。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{项目组织}}]
-mars
-├── build
-├── CMakeLists.txt
-├── include
-│   └── mars
-├── src
-│   ├── CMakeLists.txt
-│   └── mars
-└── test
-    ├── CMakeLists.txt
-    └── mars
- \end{c++}
-\end{leftbar}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.6\textwidth]{figures/xunit/mars-project.png}
+\caption{xUnit Mars: 项目组织}
+ \label{fig:mars-project}
+\end{figure}
 
 \subsection{构建系统}
 
@@ -147,7 +142,7 @@ $ git commit -m"setup project"
 
 \subsection{测试用例}
 
-万事开头难，第一个用例跑起来并不容易。此处设计实现了一个简单的测试用例，用户通过扩展\ascii{xUnit Mars}框架中的\ascii{TestCase}，增加新的测试用例。一般地，在面向对象设计中，扩展子类实现是遵循开放封闭原则的重要手段。
+万事开头难，第一个用例跑起来并不容易。此处设计实现了一个简单的测试用例，用户通过扩展\ascii{xUnit Mars}框架中的\ascii{TestCase}，实现测试用例的增加。
 
 \begin{leftbar}
  \begin{c++}[caption={\ttfamily{test/mars/core/TestCaseSpec.cc}}]
@@ -182,11 +177,15 @@ TEST(SimpleTest, make_sure_test_case_can_run_normally) {
 
 \begin{content}
 
-\ascii{TDD}是极限编程中重要的技术实践之一。在\ascii{TDD}实践过程中，信心指数应该是平滑的。如果步子迈得过大，则恢复测试时间间隔会变长，信心指数则会下降。把握住\ascii{TDD}动态变化过程，做到收放自如，需要长期的编程实践，让“小”成为工作中的一种习惯。
+\ascii{TDD}是极限编程中重要的技术实践之一。\ascii{TDD}遵循\emph{测试先行，小步快走，尽快变绿，事后重构}的基本方法论。把握\ascii{TDD}动态变化过程，做到收放自如，需要长期编程实践的经验积累。
+
+\ascii{TDD}基本素养讲究两个字：“小”和“快”。“小”体现在测试刚好失败，实现恰如其分，重构步骤粒度甚微。而“快”体现不在于编程速度，而在于“尽最小努力，最短时间，最快通过测试”。
+
+如果步子迈得过大，则恢复测试时间间隔会变长，信心指数则会下降，自然影响软件质量，甚至拖延软件交付进度。
 
 \subsubsection{TDD闭环}
 
-\ascii{TDD}遵循小步快走，测试先行的基本方法论，每轮迭代依次执行\ascii{“Red-Green-Refactor”}。每轮迭代之后，系统都处于一个相对合理的状态，如\refig{tdd-cycle}所示。
+如\refig{tdd-cycle}所示，在一轮\ascii{TDD}编程实践过程中，遵循三部曲的闭环操作：\ascii{“Red-Green-Refactor”}。每轮迭代之后，确保系统都处于一个相对合理的状态。
 
 \begin{figure}[H]
 \centering
@@ -197,7 +196,7 @@ TEST(SimpleTest, make_sure_test_case_can_run_normally) {
 
 \subsubsection{TDD实现方法}
 
-极限编程之父\ascii{Kent Beck}在经典的\ascii{Test-Driven Development by Example}书中，介绍了三种基本的实现方法。
+极限编程之父\ascii{Kent Beck}在经典著作\ascii{Test-Driven Development by Example}之中，介绍了三种基本的实现方法。
 
 \begin{enum}
   \eitem{伪实现}
@@ -207,13 +206,13 @@ TEST(SimpleTest, make_sure_test_case_can_run_normally) {
 
 使用硬编码，伪装通过测试是一种最快速、最简单的实现方法。一旦通过测试，然后通过重构消除重复，以期待消除所有硬编码；或使用三角法，添加新的测试用例，驱动真实实现。
 
-除非问题看起来并没有想象中那么简单，采取保守的策略也是恰当的。如果实现显而易见，完全可以绕开保守的\emph{伪实现}与\emph{三角法}。而在实际操作中，通过测试往往都比较简单，显式实现也是最常见的做法。在这种情况下，大可快速前进，不用处处敬小慎微。
+除非问题看起来并没有想象中那么简单，可以采取保守的策略也是恰当的。如果实现显而易见，完全可以绕开保守的\emph{伪实现}与\emph{三角法}。而在实际操作中，通过测试往往都比较简单，显式实现也是最常见的做法。在这种情况下，大可快速前进，不用处处敬小慎微。
 
 \subsubsection{尽快变绿}
 
 三种实现方法常常交替使用，虽然实现迥异，但殊途同归：以最小的努力，在最短的时间，通过测试，尽快变绿。实现过程中，尽量不要引入过度复杂的实现。例如，引入某种设计模式，重构既有的代码。
 
-务必克服心中的恶魔，需要充分衡量成本收益比。如果引入设计较为笨重，通过测试遥遥无期，则应立即放弃；而如果引入设计显而易见，实施起来也比较容易操作，并带来一定设计的弹性，且不影响通过测试的整体进度，则可以接受。
+务必克服心中的恶魔，需要充分衡量成本收益比。如果引入设计较为笨重，通过测试遥遥无期，则应立即放弃；而如果引入设计显而易见，实施起来也比较容易操作，并带来一定设计的弹性，且不影响通过测试的整体进度，则可以有限接受。
 
 \subsubsection{重构成为习惯}
 
@@ -243,7 +242,7 @@ TEST(SimpleTest, make_sure_test_case_can_run_normally) {
 
 \subsubsection{TDD实现技巧}
 
-实践\ascii{TDD}时，常需要规划和维护一个\ascii{TODO List}。将熟悉的，价值大，容易实现，实现基本功能的测试用例优先实现；而将不熟悉，价值小，不易实现，异常边界的测试用例依次排到后面，留待后续处理。
+实践\ascii{TDD}时，常需要规划和维护一个\ascii{TODO List}。将熟悉的，价值大，容易实现，高优先级的测试用例优先实现；而将不熟悉，价值小，不易实现，异常边界的测试用例依次排到后面，留待后续处理。
 
 \begin{enum}
   \eitem{基本功能与异常场景；}  
@@ -266,8 +265,8 @@ TEST(SimpleTest, make_sure_test_case_can_run_normally) {
 #define H586108AA_CD7B_459D_8A2F_0DFE6C9720ED
 
 struct TestCase {
-  virtual ~TestCase() {}
   virtual void run() = 0;
+  virtual ~TestCase() {}
 };
 
 #endif
@@ -278,7 +277,7 @@ struct TestCase {
 
 \begin{content}
 
-\ascii{C/C++}的编译模型通过使用\ascii{include}语句载入头文件，为了避免头文件被载入多次，每一个头文件都应该定义独一无二的头文件保护宏。社区存在两种风格：
+\ascii{C/C++}编译模型通过使用\ascii{include}语句导入头文件而实现的。为了避免头文件被导入多次，每一个头文件都应该定义独一无二的头文件保护宏。社区存在两种典型的代码风格：
 
 \begin{enum}
   \eitem{\code{INCL\_<PROJECT>\_<MODULE>\_<FILE>\_H}}
@@ -291,7 +290,7 @@ struct TestCase {
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=1.0\textwidth]{figures/xunit/eclipse-code-template.png}
+\includegraphics[width=0.95\textwidth]{figures/xunit/eclipse-code-template.png}
 \caption{Eclipse CDT: 代码模板}
  \label{fig:eclipse-code-template}
 \end{figure}
@@ -300,7 +299,7 @@ struct TestCase {
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=1.0\textwidth]{figures/xunit/eclipse-include-guard.png}
+\includegraphics[width=0.95\textwidth]{figures/xunit/eclipse-include-guard.png}
 \caption{Eclipse CDT: 生成UUID的头文件保护宏}
  \label{fig:eclipse-include-guard}
 \end{figure}
@@ -308,13 +307,11 @@ struct TestCase {
 为了缩短篇幅，后文略去所有头文件保护符。
 
 \end{content}
-
 \end{episode}
 
-需要关注的是，\ascii{TestCase}实现了一个虚拟析构函数。如果不经意地遗忘声明该析构函数为虚拟的\footnote{默认生成的析构函数是非虚拟的。}，则可能招致运行时不确定的行为发生。
+需要关注的是，\ascii{TestCase}实现了一个虚拟析构函数。如果不经意地遗忘声明该析构函数为虚拟的\footnote{默认生成的析构函数是公开的、非虚拟的、内联实现的。}，则可能招致运行时不确定的行为发生。
 
 \begin{episode}{虚拟析构函数}
-
 \begin{content}
 
 一般地，需要为\emph{多态基类}声明虚拟析构函数；否则，会招致运行时不可预期的行为。一般地，如果一个类包含虚函数时，便将其析构函数声明为虚拟的。
@@ -347,7 +344,7 @@ TRAIT(SelfDescribing) {
 
 \subsubsection{抽象函数}
 
-此外，定义纯虚函数时，常常遗忘了后面的\ascii{0}。可以引入另外一个宏定义。
+此外，定义纯虚函数时，常常会遗忘后面的\ascii{0}。可以引入另外一个宏定义。
 
  \begin{c++}
 #define ABSTRACT(...) virtual __VA_ARGS__ = 0
@@ -364,12 +361,11 @@ TRAIT(SelfDescribing) {
 \end{c++}
 
 \end{content}
-
 \end{episode}
 
 \subsection{通过链接}
 
-创建了一个空的\ascii{TestCase.cc}文件，仅为了\ascii{libmars.a}不为空，保证链接成功。
+创建一个空的\ascii{TestCase.cc}文件，这里仅为了\ascii{libmars.a}不为空，保证\ascii{CMake}构建系统工作正常；否则，\ascii{CMake}提示\ascii{mars}项目为空，无法构建\ascii{libmars.a}库。
 
 \begin{leftbar}
  \begin{c++}[caption={\ttfamily{src/mars/core/TestCase.cc}}]
@@ -377,12 +373,13 @@ TRAIT(SelfDescribing) {
  \end{c++}
 \end{leftbar}
 
-
 \begin{episode}{多屏编辑}
 
 \begin{content}
 
-在\cpp{}编程实践中，需要在头文件和实现文件之间频繁切换。同时，在\ascii{TDD}编程实践中，也需要在测试文件与头文件/实现文件之间频繁切换。得益于现代\ascii{IDE}的丰富特性，推荐多屏显示相关源文件。例如，如\refig{multi-editor-eclipse}所示，使用\ascii{Eclipse CDT}，三屏分别显示相关联的头文件、实现文件，及其测试用例文件。
+在\cpp{}编程实践中，需要在头文件和实现文件之间频繁切换。同时，在\ascii{TDD}编程实践中，也需要在测试文件与头文件/实现文件之间频繁切换。
+
+得益于现代\ascii{IDE}的丰富特性，推荐多屏显示相关源文件。例如，如\refig{multi-editor-eclipse}所示，使用\ascii{Eclipse CDT}，三屏分别显示相关联的头文件、实现文件，及其测试用例文件。
 
 \begin{figure}[H]
 \centering
@@ -391,7 +388,7 @@ TRAIT(SelfDescribing) {
  \label{fig:multi-editor-eclipse}
 \end{figure}
 
-因此，推荐购置高清，大屏显示器，有效改善编程环境，从而提高工作效率。此外，推荐关闭其他无关的\ascii{Tab}页，只打开当前相关的源文件，最小化外部干扰；一则让\ascii{IDE}运行速度最佳，二则使用诸如\ascii{Ctrl + E}快捷键切换文件时，最小化文件列表长度。
+推荐购置高清，大屏显示器，有效改善编程环境，从而提高工作效率。关闭无关的\ascii{Tab}页，只打开当前相关的文件，最小化外部干扰；一则让\ascii{IDE}运行速度最佳，二则使用诸如\ascii{Ctrl + E}快捷键切换文件时，最小化文件列表长度。
 
 强烈推荐使用快捷键的优秀实践，可以成倍地提高编程的效率。例如，使用快捷键\ascii{Ctrl + Tab}，在头文件与实现文件间切换自如。
 

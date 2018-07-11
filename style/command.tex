@@ -156,6 +156,12 @@ rectangle, rounded corners, inner sep=9pt, inner ysep=20pt]
 
 \newtcolorbox{episode}[1]{enhanced jigsaw,breakable,pad at break*=1mm,colback=red!5!white, colframe=red!75!black,fonttitle=\bfseries, colbacktitle=red!85!black,enhanced, attach boxed title to top center={yshift=-2mm}, watermark color=white,watermark text=\Roman{tcbbreakpart},title=#1}
 
+\newtcolorbox[auto counter,number within=section]{diff}[1]{left=0mm,right=0mm,oversize,enhanced jigsaw,breakable,pad at break*=1mm,colback=red!5!white,colframe=red!75!black,fonttitle=\bfseries, colbacktitle=red!85!black,enhanced, attach boxed title to top left={yshift=-2mm}, watermark color=white,title=\lstlistingname\thetcbcounter\ \code{#1},sidebyside,align=top,sidebyside align=top,sidebyside gap=3mm}
+
+% \newtcolorbox[auto counter,number within=chapter]{diff}[1]{%
+% colback=red!5!white,colframe=red!75!black,fonttitle=\bfseries,
+% adjusted title=\lstlistingname\thetcbcounter\code{#1},sidebyside}
+
 \usepackage{enumitem,amssymb}
 \usepackage{pifont}
 
