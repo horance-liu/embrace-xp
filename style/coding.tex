@@ -18,7 +18,7 @@ basicstyle=\scriptsize\ttfamily,           %% 设定字体大小\tiny, \scriptsi
 keywordstyle=\bfseries,
 commentstyle=\color{red!50!green!50!blue!50},                           
 escapechar=`,                        %% 中文逃逸字符，用于中英混排
-xleftmargin=0em,xrightmargin=0em, aboveskip=0em,
+xleftmargin=1.5em,xrightmargin=0em, aboveskip=1.0em,
 breaklines,                          %% 这条命令可以让LaTeX自动将长的代码行换行排版
 extendedchars=false,                 %% 这一条命令可以解决代码跨页时，章节标题，页眉等汉字不显示的问题
 frameround=fttt,
@@ -46,10 +46,16 @@ belowcaptionskip=1em
    %rulesep=5pt
 }
 
+\lstnewenvironment{minicpp}[1][]
+  {\setstretch{1}
+  \lstset{style=C++, xleftmargin=0.0em, #1}}
+  {}
+
 \lstnewenvironment{c++}[1][]
   {\setstretch{1}
   \lstset{style=C++, #1}}
   {}
+
 
 %\captionsetup[lstlisting]{textfont=red}
 %{labelfont=bf, singlelinecheck=off, labelsep=space, textfont=red}

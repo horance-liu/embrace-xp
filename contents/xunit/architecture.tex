@@ -28,8 +28,8 @@
 
 \ascii{Google Test}出自名家，自带光环。其功能强大，系统稳定，移植性良好，支持用例自动发现机制，相对于社区其它\ascii{xUnit}框架更显技高一筹，在\ascii{C++}社区占据主导地位。但是，\ascii{Google Test}也存在一些不尽人意的细节之处。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{Google Test样例}}]
+\begin{nodiff}{Google Test样例}
+ \begin{c++}
 #include <gtest/gtest.h>
 #include <stack>
 
@@ -61,7 +61,77 @@ TEST_F(StackSpec, apply_pop_2_time) {
   ASSERT_TRUE(s.empty());
 }
  \end{c++}
-\end{leftbar}
+\end{nodiff}
+
+\begin{nodiff}{Google Test样例}
+ \begin{c++}
+#include <gtest/gtest.h>
+#include <stack>
+
+namespace {
+  struct StackSpec : testing::Test {
+  private:
+    void SetUp() override {
+      s.push(1);
+      s.push(2);
+    }
+
+  protected:
+    std::stack<int> s;
+  };
+}
+
+TEST_F(StackSpec, apply_pop_0_time) {
+  ASSERT_EQ(2, s.top());
+}
+
+TEST_F(StackSpec, apply_pop_1_time) {
+  s.pop();
+  ASSERT_EQ(1, s.top());
+}
+
+TEST_F(StackSpec, apply_pop_2_time) {
+  s.pop();
+  s.pop();
+  ASSERT_TRUE(s.empty());
+}
+ \end{c++}
+\end{nodiff}
+
+\begin{nodiff}{Google Test样例}
+ \begin{c++}
+#include <gtest/gtest.h>
+#include <stack>
+
+namespace {
+  struct StackSpec : testing::Test {
+  private:
+    void SetUp() override {
+      s.push(1);
+      s.push(2);
+    }
+
+  protected:
+    std::stack<int> s;
+  };
+}
+
+TEST_F(StackSpec, apply_pop_0_time) {
+  ASSERT_EQ(2, s.top());
+}
+
+TEST_F(StackSpec, apply_pop_1_time) {
+  s.pop();
+  ASSERT_EQ(1, s.top());
+}
+
+TEST_F(StackSpec, apply_pop_2_time) {
+  s.pop();
+  s.pop();
+  ASSERT_TRUE(s.empty());
+}
+ \end{c++}
+\end{nodiff}
 
 \subsubsection{命名}
 

@@ -35,6 +35,41 @@
 \label{tbl:env-configure}
 \end{table}
 
+\begin{nodiff}{Google Test样例}
+ \begin{c++}
+#include <gtest/gtest.h>
+#include <stack>
+
+namespace {
+  struct StackSpec : testing::Test {
+  private:
+    void SetUp() override {
+      s.push(1);
+      s.push(2);
+    }
+
+  protected:
+    std::stack<int> s;
+  };
+}
+
+TEST_F(StackSpec, apply_pop_0_time) {
+  ASSERT_EQ(2, s.top());
+}
+
+TEST_F(StackSpec, apply_pop_1_time) {
+  s.pop();
+  ASSERT_EQ(1, s.top());
+}
+
+TEST_F(StackSpec, apply_pop_2_time) {
+  s.pop();
+  s.pop();
+  ASSERT_TRUE(s.empty());
+}
+ \end{c++}
+\end{nodiff}
+
 \begin{episode}{代码风格}
 
 \begin{content}
@@ -256,6 +291,41 @@ TEST(SimpleTest, make_sure_test_case_can_run_normally) {
 \end{episode}
 
 \subsection{通过编译}
+
+\begin{nodiff}{Google Test样例}
+ \begin{c++}
+#include <gtest/gtest.h>
+#include <stack>
+
+namespace {
+  struct StackSpec : testing::Test {
+  private:
+    void SetUp() override {
+      s.push(1);
+      s.push(2);
+    }
+
+  protected:
+    std::stack<int> s;
+  };
+}
+
+TEST_F(StackSpec, apply_pop_0_time) {
+  ASSERT_EQ(2, s.top());
+}
+
+TEST_F(StackSpec, apply_pop_1_time) {
+  s.pop();
+  ASSERT_EQ(1, s.top());
+}
+
+TEST_F(StackSpec, apply_pop_2_time) {
+  s.pop();
+  s.pop();
+  ASSERT_TRUE(s.empty());
+}
+ \end{c++}
+\end{nodiff}
 
 此处引入了多态技术，当\ascii{TestCase::run}启动运行时，将在运行时调用覆写的\ascii{SimpleTest::run}，实现自定义测试用例的执行。
 

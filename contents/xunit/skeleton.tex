@@ -18,8 +18,8 @@
 
 \subsection{测试用例}
 
-\begin{diff}{test/mars/core/TestCaseSpec.cc}
- \begin{c++}
+\begin{topdiff}{test/mars/core/TestCaseSpec.cc}
+ \begin{minicpp}
 #include <gtest/gtest.h>
 #include "mars/core/TestCase.h"
 
@@ -44,19 +44,56 @@ TEST(SimpleTest, make_sure_test_case_can_run_normally) {
 
   ASSERT_TRUE(test.wasRun);
 }
+ \end{minicpp}
+\tcblower
+ \begin{minicpp}
+#include <gtest/gtest.h>
+#include "mars/core/TestCase.h"
 
-TEST(SimpleTest, make_sure_test_case_can_run_normally) {
-  SimpleTest test;
-  run(test);
+namespace {
+  struct SimpleTest : TestCase {
+    bool wasSetUp = false;
+    bool wasRun = false;
 
-  ASSERT_TRUE(test.wasRun);
+  private:
+    void setUp() override {
+      wasSetUp = true;
+    }
+
+    void runTest() override {
+      wasRun = true;
+    }
+  };
 }
 
 TEST(SimpleTest, make_sure_test_case_can_run_normally) {
   SimpleTest test;
-  run(test);
+  test.run();
 
+  ASSERT_TRUE(test.wasSetUp);
   ASSERT_TRUE(test.wasRun);
+}
+ \end{minicpp} 
+\end{topdiff}
+
+\begin{lastdiff}
+ \begin{c++}
+#include <gtest/gtest.h>
+#include "mars/core/TestCase.h"
+
+namespace {
+  struct SimpleTest : TestCase {
+    bool wasRun = false;
+
+  private:
+    void run() override {
+      wasRun = true;
+    }
+  };
+
+  void run(TestCase& test) {
+    test.run();
+  }
 }
 
 TEST(SimpleTest, make_sure_test_case_can_run_normally) {
@@ -95,7 +132,7 @@ TEST(SimpleTest, make_sure_test_case_can_run_normally) {
   ASSERT_TRUE(test.wasRun);
 }
  \end{c++} 
-\end{diff}
+\end{lastdiff}
 
 被覆写的\ascii{SimpleTest::setUp, SimpleTest::runTest}成员函数被显式声明为\ascii{override}与\ascii{private}。前者在编译时完成函数签名的合法性检查，后者限制外部用户使用\ascii{SimpleTest}对象直接调用\ascii{setUp, runTest}成员函数。
 
