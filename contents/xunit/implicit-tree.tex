@@ -18,10 +18,10 @@
 
 \subsection{测试用例}
 
-为了确定每个\ascii{TestCase}都被执行，可以简单定制一个计数器\ascii{num}，用例执行后，断言已运行用例的数目。
+为了确定每个\ascii{TestCase}都被执行，可以简单定制一个计数器\ascii{num}。用例执行后，断言已运行用例的数目。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{test/mars/core/TestSuiteSpec.cc}}]
+\begin{nodiff}{test/mars/core/TestSuiteSpec.cc}
+ \begin{c++}
 #include <gtest/gtest.h>
 #include "mars/core/TestCase.h"
 #include "mars/core/TestSuite.h"
@@ -37,7 +37,7 @@ namespace {
   };
 }
 
-TEST(TestSuite, run_multi_test_cases_using_test_suite) {
+TEST(TestSuite, pack_test_cases_into_test_suite) {
   TestSuite suite;
   suite.add(new FooTest);
   suite.add(new FooTest);
@@ -47,14 +47,14 @@ TEST(TestSuite, run_multi_test_cases_using_test_suite) {
   ASSERT_EQ(2, num);
 }
  \end{c++}
-\end{leftbar}
+\end{nodiff}
 
 \subsection{通过编译}
 
-为了快速通过编译，创建\ascii{TestSuite}的头文件。
+为了快速通过编译，创建\ascii{TestSuite}的头文件。需要注意的是，\ascii{TestSuite}仅对\ascii{TestCase}的指针类型产生依赖，前置声明\ascii{struct TestCase}即可。但是，\ascii{TestSuite}对值对象\ascii{std::vector}则表现为强依赖，因此需要包含头文件。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{include/mars/core/TestSuite.h}}]
+\begin{nodiff}{include/mars/core/TestSuite.h}
+ \begin{c++}
 #include <vector>
 
 struct TestCase;
@@ -67,12 +67,9 @@ private:
   std::vector<TestCase*> tests;
 };
  \end{c++}
-\end{leftbar}
+\end{nodiff}
 
-\begin{story}
-  \begin{center}
-    \inlinetitle{最小依赖原则： 前置声明 VS. 包含头文件}
-  \end{center}
+\begin{episode}{最小化编译时依赖： 前置声明 VS. 包含头文件}
 
 \begin{content}
 
@@ -100,34 +97,16 @@ private:
   \eitem{\ascii{typedef/using}类型别名}
 \end{enum}
 
-例如，\ascii{TestSuite}仅对\ascii{TestCase}的指针类型产生依赖，前置声明\ascii{struct TestCase}即可。但是，\ascii{TestSuite}对值对象\ascii{std::vector}则表现为强依赖，因此需要包含头文件。
-
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{include/mars/core/TestSuite.h}}]
-#include <vector>
-
-struct TestCase;
-
-struct TestSuite {
-  void add(TestCase* test);
-  void run();
-
-private:
-  std::vector<TestCase*> tests;
-};
- \end{c++}
-\end{leftbar}
-
 \end{content}
 
-\end{story}
+\end{episode}
 
 \subsection{通过测试}
 
 为了通过测试，可以快速实现\ascii{TestSuite::run}的逻辑。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{src/mars/core/TestSuite.cc}}]
+\begin{nodiff}{src/mars/core/TestSuite.cc}
+ \begin{c++}
 #include "mars/core/TestSuite.h"
 #include "mars/core/TestCase.h"
 
@@ -141,31 +120,108 @@ void TestSuite::run() {
   }
 }
  \end{c++}
-\end{leftbar}
+\end{nodiff}
 
-\begin{story}
-  \begin{center}
-    \inlinetitle{验证头文件的自满足性}
-  \end{center}
+\begin{episode}{验证头文件的自满足性}
 
 \begin{content}
 
-所谓头文件自满足性，即头文件自身是可编译成功的。为了验证头文件的自满足性，其对应的实现文件的第一行代码，应该包含其对应的头文件。如果此头文件不自满足，自然会导致编译失败，此方法是验证头文件是否自满足的一个有效方法。
+所谓头文件自满足性，即头文件自身是可编译成功的。为了验证头文件的自满足性，其实现文件需要第一个包含对应的头文件。如果此头文件不自满足，自然会导致编译失败，此方法是验证头文件是否自满足的一个有效方法。
 
-如果一个头文件不自满足，当客户需要引用该头文件时，则需要客户自行承担寻找相关依赖的职责。客户因缺乏相关上下文信息，寻找缺失的依赖并非易事。
+例如，对于头文件\ascii{include/mars/core/TestSuite.h}，在其相应的实现文件中，需要第一个包含自己的头文件。
 
-头文件作为代码的作者对外公开\ascii{API}的重要途径，在发布之前，有责任保证其可用性，并且是最小依赖的。在极端条件下，头文件可能不存在相应的实现文件。此时，也需要创建临时的实现文件，并校验头文件的自满足性；直至成功，才可以删除该临时文件。
+\begin{inlinediff}
+ \begin{minicpp}
+// 反例
+#include "mars/core/TestCase.h"
+#include "mars/core/TestSuite.h"
+ \end{minicpp} 
+\tcblower
+ \begin{minicpp}
+// 正例
+#include "mars/core/TestSuite.h"
+#include "mars/core/TestCase.h"
+ \end{minicpp} 
+\end{inlinediff}
+
+头文件作为代码所有者对外公开\ascii{API}的重要途径。在发布之前，有责任保证其可用性，及其最小依赖性。如果一个头文件不自满足，当客户需要引用该头文件时，则需要客户自行承担寻找相关依赖的职责。客户因缺乏相关上下文信息，寻找缺失的依赖并非易事。
+
+在极端条件下，头文件可能不存在相应的实现文件。例如，模板类或模板函数。此时，可以创建相应的测试文件，第一个包含其对应的头文件，校验头文件的自满足性；并对该模板实例化，实施简单的测试，确保编译与功能正确。
+
+\begin{c++}[title={\ttfamily{实现ScopedExit：include/mars/util/ScopedExit.h}}]
+#include "mars/util/Symbol.h"
+
+template <typename F>
+struct ScopedExit {
+  ScopedExit(F f) : f(f) {
+  }
+
+  ~ScopedExit(){ 
+    f(); 
+  }
+
+private:
+  F f;
+};
+
+template <typename F>
+ScopedExit<F> make_scoped_exit(F f) {
+  return ScopedExit<F>(f);
+};
+
+#define SCOPED_EXIT(f) \
+    auto UNIQUE_NAME(scoped_exit_) = make_scoped_exit(f)
+\end{c++}
+
+其中，\ascii{UNIQUE\_NAME}是一个通用的宏，可以放在基础设施之中。
+
+\begin{c++}[title={\ttfamily{实用宏：include/mars/util/Symbol.h}}]
+#define __DO_JOIN_AGAIN(symbol1, symbol2) symbol1##symbol2
+#define __DO_JOIN(symbol1, symbol2) __DO_JOIN_AGAIN(symbol1, symbol2)
+
+#define JOIN(symbol1, symbol2) __DO_JOIN(symbol1, symbol2)
+#define UNIQUE_NAME(prefix) JOIN(prefix, __COUNTER__)
+\end{c++}
+
+在测试文件中，第一个包含该头文件，并尝试最简单的单元测试。
+
+\begin{c++}[title={\ttfamily{测试ScopedExit：test/mars/util/ScopedExitSpec.cc}}]
+#include "mars/util/ScopedExit.h"
+#include <gtest/gtest.h>
+#include <stdio.h>
+
+TEST(ScopedExitSpec, close_file_safely) {
+  auto file = std::fopen("~/.bashrc", "r");
+  SCOPED_EXIT([file] {
+    fclose(file);
+  });
+}
+\end{c++}
 
 \end{content}
 
-\end{story}
+\end{episode}
 
 \subsection{内存泄露}
 
 \ascii{TestSuite}持有若干\ascii{TestCase}实例，引入析构函数释放动态创建并添加至\ascii{TestSuite}的所有\ascii{TestCase}实例。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{include/mars/core/TestSuite.h}}]
+\begin{diff}{include/mars/core/TestSuite.h}
+ \begin{minicpp}
+#include <vector>
+
+struct TestCase;
+
+struct TestSuite {
+  void add(TestCase* test);
+  void run();
+
+private:
+  std::vector<TestCase*> tests;
+};
+ \end{minicpp}
+\tcblower
+ \begin{minicpp}
 #include <vector>
 
 struct TestCase;
@@ -179,13 +235,13 @@ struct TestSuite {
 private:
   std::vector<TestCase*> tests;
 };
- \end{c++}
-\end{leftbar}
+ \end{minicpp}
+\end{diff}
 
 实现析构函数，释放动态内存。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{src/mars/core/TestSuite.cc}}]
+\begin{diff}{src/mars/core/TestSuite.cc}
+ \begin{minicpp}
 #include "mars/core/TestSuite.h"
 #include "mars/core/TestCase.h"
 
@@ -193,10 +249,25 @@ void TestSuite::add(TestCase* test) {
   tests.push_back(test);
 }
 
+void TestSuite::run() {
+  for (auto test : tests) {
+    test->run();
+  }
+}
+ \end{minicpp}
+\tcblower
+ \begin{minicpp}
+#include "mars/core/TestSuite.h"
+#include "mars/core/TestCase.h"
+
 TestSuite::~TestSuite() {
   for (auto test : tests) {
     delete test;
   }
+}
+
+void TestSuite::add(TestCase* test) {
+  tests.push_back(test);
 }
 
 void TestSuite::run() {
@@ -204,15 +275,31 @@ void TestSuite::run() {
     test->run();
   }
 }
- \end{c++}
-\end{leftbar}
+ \end{minicpp}
+\end{diff}
 
 \subsection{消除重复}
 
 为了消除析构函数与\ascii{run}之间的重复代码，提取一个公共的\ascii{foreach}函数。注意，不要在头文件直接实现该模板函数，最小化编译时的依赖。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{include/mars/core/TestSuite.h}}]
+\begin{diff}{include/mars/core/TestSuite.h}
+ \begin{minicpp}
+#include <vector>
+
+struct TestCase;
+
+struct TestSuite {
+  ~TestSuite();
+
+  void add(TestCase* test);
+  void run();
+
+private:
+  std::vector<TestCase*> tests;
+};
+ \end{minicpp}
+\tcblower
+ \begin{minicpp}
 #include <vector>
 
 struct TestCase;
@@ -230,20 +317,34 @@ private:
 private:
   std::vector<TestCase*> tests;
 };
- \end{c++}
-\end{leftbar}
-
-因此，设计得到两个独立变化的方向。
-
-\begin{enum}
-  \eitem{\ascii{迭代算法：因存储结构变化而变化(目前实现为线性列表，不排除将来实现为map)；}}
-  \eitem{\ascii{处理算子：存在删除，计数，运行等操作。}}
-\end{enum}
+ \end{minicpp}
+\end{diff}
 
 可以使用\ascii{Lambda}表达式定制各种算子，实现差异化配置，实现对迭代算法的高度复用。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{src/mars/core/TestSuite.cc}}]
+\begin{diff}{src/mars/core/TestSuite.cc}
+ \begin{minicpp}
+#include "mars/core/TestSuite.h"
+#include "mars/core/TestCase.h"
+
+TestSuite::~TestSuite() {
+  for (auto test : tests) {
+    delete test;
+  }
+}
+
+void TestSuite::add(TestCase* test) {
+  tests.push_back(test);
+}
+
+void TestSuite::run() {
+  for (auto test : tests) {
+    test->run();
+  }
+}
+ \end{minicpp}
+\tcblower
+ \begin{minicpp}
 #include "mars/core/TestSuite.h"
 #include "mars/core/TestCase.h"
 
@@ -269,20 +370,23 @@ void TestSuite::run() {
     test->run();
   });
 }
- \end{c++}
-\end{leftbar}
+ \end{minicpp}
+\end{diff}
 
-\begin{story}
-  \begin{center}
-    \inlinetitle{基于范围的for语句}
-  \end{center}
+设计分离了两个变化方向，使其两者完全分离，并能独立变化。
+
+\begin{enum}
+  \eitem{\ascii{迭代算法：因存储结构变化而变化(目前实现为线性表)；}}
+  \eitem{\ascii{处理算子：存在删除，计数，运行等操作。}}
+\end{enum}
+
+\begin{episode}{基于范围的for语句}
 
 \begin{content}
 
 存在泛型方法\ascii{foreach}的一种实现。不幸的是，它引入了复杂的\ascii{typedef typename}类型别名机制\footnote{\cpp{}也因诸如此类冗余的、复杂的类型说明，招致不公平的评论。}。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{foreach：应用for循环，C++98}}]
+ \begin{c++}[title={\ttfamily{实现foreach：应用for循环，C++98}}]
 template<typename T, typename F>
 void foreach(const std::vector<T>& c, F f) {
   typedef typename std::vector<T>::const_iterator Iterator;
@@ -291,12 +395,10 @@ void foreach(const std::vector<T>& c, F f) {
   }
 }
  \end{c++}
-\end{leftbar}
 
 得益于\ascii{C++11}自动类型推演，可以去除\ascii{typedef}类型别名。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{foreach：应用for循环，auto类型推演，C++11}}]
+ \begin{c++}[title={\ttfamily{实现foreach：应用for循环，auto类型推演，C++11}}]
 template<typename T, typename F>
 void foreach(const std::vector<T>& c, F f) {
   for (auto first = c.begin(), last = c.end(); first != last; ++first) {
@@ -304,12 +406,10 @@ void foreach(const std::vector<T>& c, F f) {
   }
 }
  \end{c++}
-\end{leftbar}
 
 甚至，可以使用基于范围的\ascii{for}语句替代常规的\ascii{for}循环。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{foreach：应用基于范围的\ascii{for}，C++11}}]
+ \begin{c++}[title={\ttfamily{实现foreach：应用基于范围的\ascii{for}，C++11}}]
 template<typename T, typename F>
 void foreach(const std::vector<T>& c, F f) {
   for (const T& e : c) {
@@ -317,12 +417,10 @@ void foreach(const std::vector<T>& c, F f) {
   }
 }
  \end{c++}
-\end{leftbar}
 
 可以将\ascii{auto}实施到底，\ascii{foreach}实现变得更加简单、实用。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{迭代器：应用auto类型推演，C++11}}]
+ \begin{c++}[title={\ttfamily{实现foreach：应用基于范围的\ascii{for}，auto类型推演，C++11}}]
 template<typename T, typename F>
 void foreach(const std::vector<T>& c, F f) {
   for (const auto& e : c) {
@@ -330,12 +428,10 @@ void foreach(const std::vector<T>& c, F f) {
   }
 }
  \end{c++}
-\end{leftbar}
 
 遗憾的是，\ascii{foreach}不够泛型，它只能接受\ascii{std::vector}，而不能接受其他容器类型，例如\ascii{std::list, std::deque, std::set}。重构\ascii{foreach}接口，使其容器类型完全泛型化，甚至能够接受临时对象\footnote{因为容器类型使用的是\ascii{const}引用类型。}。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{实现foreach：容器泛化，C++11}}]
+ \begin{c++}[title={\ttfamily{实现foreach：容器泛化，C++11}}]
 template<typename Container, typename F>
 void foreach(const Container& c, F f) {
   for (const auto& e : c) {
@@ -343,17 +439,16 @@ void foreach(const Container& c, F f) {
   }
 }
  \end{c++}
-\end{leftbar}
 
 \end{content}
 
-\end{story}
+\end{episode}
 
 \section{嵌套结构}
 
-为了实现更好的可扩展性，\ascii{TestSuite}不仅能打包\ascii{TestCase}实例，也应该能够打包更小的\ascii{TestSuite}的子实例，实现隐式的树结构。
+为了实现更好的可扩展性，\ascii{TestSuite}不仅能打包\ascii{TestCase}实例，也应该能够打包更小的\ascii{TestSuite}的子实例，实现隐式的树结构。如\refig{test-case-tree}所示。
 
-\begin{figure}[H]
+\begin{figure}
 \centering
 \includegraphics[width=0.8\textwidth]{figures/xunit/test-tree-example.png}
 \caption{用例树：TestSuite(s1, s2, s3),TestCase(t1,t2,t3,t4)}
@@ -366,11 +461,38 @@ void foreach(const Container& c, F f) {
 
 此处没有直接调用\ascii{TestSuite::run}，而是使用更为抽象的\ascii{Test::run}，测试装置将更加稳定。在实现\ascii{TestSuiteSpec::run}时，显式地使用域限定符\ascii{::Test}，避免与\ascii{testing::Test}产生二义性而导致编译失败。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{test/mars/core/TestSuiteSpec.cc}}]
-#include <gtest/gtest.h>
-#include "mars/core/TestCase.h"
+\begin{diff}{test/mars/core/TestSuiteSpec.cc}
+ \begin{minicpp}
 #include "mars/core/TestSuite.h"
+#include "mars/core/TestCase.h"
+#include <gtest/gtest.h>
+
+namespace {
+  int num = 0;
+
+  struct FooTest : TestCase {
+  private:
+    void runTest() override {
+      num++;
+    }
+  };
+}
+
+TEST_F(TestSuiteSpec, pack_test_cases_into_test_suite) {
+  TestSuite suite;
+  suite.add(new FooTest);
+  suite.add(new FooTest);
+
+  run(suite);
+
+  ASSERT_EQ(2, num);
+}
+ \end{minicpp}
+\tcblower
+ \begin{minicpp}
+#include "mars/core/TestSuite.h"
+#include "mars/core/TestCase.h"
+#include <gtest/gtest.h>
 
 namespace {
   int num = 0;
@@ -397,7 +519,7 @@ namespace {
   };
 }
 
-TEST_F(TestSuiteSpec, package_multi_test_cases_into_test_suite) {
+TEST_F(TestSuiteSpec, pack_test_cases_into_test_suite) {
   TestSuite suite;
   suite.add(new FooTest);
   suite.add(new FooTest);
@@ -405,6 +527,41 @@ TEST_F(TestSuiteSpec, package_multi_test_cases_into_test_suite) {
   run(suite);
 
   ASSERT_EQ(2, num);
+}
+ \end{minicpp}
+\end{diff}
+
+\subsection{测试用例}
+
+在既有的测试装置上，新增一个失败的测试用例。
+
+\begin{nodiff}{test/mars/core/TestSuiteSpec.cc}
+ \begin{c++}
+#include "mars/core/TestSuite.h"
+#include "mars/core/TestCase.h"
+#include <gtest/gtest.h>
+
+namespace {
+  int num = 0;
+
+  struct FooTest : TestCase {
+  private:
+    void runTest() override {
+      num++;
+    }
+  };
+
+  struct TestSuiteSpec : testing::Test {
+  private:
+    void SetUp() override {
+      num = 0;  // IMPORTANT: reset counter.
+    }
+
+  protected:
+    void run(::Test& test) {
+      test.run();
+    }
+  };
 }
 
 TEST_F(TestSuiteSpec, package_sub_test_suite_into_outter_test_suite) {
@@ -418,23 +575,17 @@ TEST_F(TestSuiteSpec, package_sub_test_suite_into_outter_test_suite) {
   run(outter);
 
   ASSERT_EQ(2, num);
-}
- \end{c++}
-\end{leftbar}
+} 
+\end{c++}
+\end{nodiff}
 
-此时，第二个测试用例编译失败。
-
-\begin{story}
-  \begin{center}
-    \inlinetitle{最小化作用域}
-  \end{center}
+\begin{episode}{最小化作用域}
 
 \begin{content}
 
 在古老的\ascii{C}程序设计语言中，要求在函数的开头实现声明所有的变量，这种代码风格和习惯被错误地保留。过早声明变量不仅使得变量作用域过早地扩展，而且会导致其过晚地终结，从而可能引入不经意的错误。例如，
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{while循环}}]
+ \begin{c++}[title={\ttfamily{while循环}}]
 auto i = c1.iterator();
 while (i.hasNext()) {
   doSomething(i.next());
@@ -445,12 +596,10 @@ while (i.hasNext()) {           // BUG!!!, should be i2.
   doSomething(i2.next());
 }
  \end{c++}
-\end{leftbar}
 
 当然，解决此类问题，最简单的办法就是引入代码块，将错误控制在编译时。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{while循环}}]
+ \begin{c++}[title={\ttfamily{while循环}}]
 {
   auto i = c1.iterator();
   while (i.hasNext()) {
@@ -465,12 +614,10 @@ while (i.hasNext()) {           // BUG!!!, should be i2.
   }
 }
  \end{c++}
-\end{leftbar}
 
 为了缩小局部变量的作用域，可以使用\ascii{for}循环替代\ascii{while}循环，因为\ascii{for}循环提供了初始器，天然支持代码块。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{for循环}}]
+ \begin{c++}[title={\ttfamily{for循环}}]
 for (auto i = c1.iterator(); i.hasNext()) {
   use(i.next());
 }
@@ -479,12 +626,10 @@ for (auto i = c2.iterator(); i.hasNext()) {
   use(i.next());
 }
  \end{c++}
-\end{leftbar}
 
 追其根因，两段代码最大的问题不是\ascii{while}与\ascii{for}之间的抉择，而是重复设计。因此，消除重复才能根除所有潜在的隐患\footnote{\ascii{Container}属于第三方集合库，并非\ascii{STL}。}。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{for循环}}]
+ \begin{c++}[title={\ttfamily{for循环}}]
 template <typename T>
 void foreach(const Container<T>& c) {
   for (auto i = c.iterator(); i.hasNext()) {
@@ -492,12 +637,10 @@ void foreach(const Container<T>& c) {
   } 
 }
  \end{c++}
-\end{leftbar}
 
 遗憾的是，目前仅\ascii{for}语句提供了初始器，直至\ascii{C++17}才完备地支持了\ascii{switch, if}语句的初始器。例如，\ascii{std::set::insert}返回一个\ascii{std::pair}，客户在\ascii{C++17}之前可能使用如下的代码风格。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{插入元素：C++17之前}}]
+ \begin{c++}[title={\ttfamily{插入元素：C++17之前}}]
 std::set<int> nums;
 
 auto result = nums.insert(0);
@@ -505,41 +648,35 @@ if (result->second) {
   use(*result->first);
 }
  \end{c++}
-\end{leftbar}
 
 如果使用\ascii{C++17}，代码实现可以更加简单和安全。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{插入元素：if初始化器与结构性绑定，C++17}}]
+ \begin{c++}[title={\ttfamily{插入元素：if初始化器与结构性绑定，C++17}}]
 std::set<int> nums;
 
 if (auto [i, succ] = nums.insert(0); succ) {
   use(*i);
 }
  \end{c++}
-\end{leftbar}
 
 \end{content}
 
-\end{story}
+\end{episode}
 
 \subsection{提取抽象}
 
-通过提取\ascii{TestCase}与\ascii{TestSuite}的共同抽象\ascii{Test}，从而使得用例的组织更加灵活。
+\ascii{TestCase}与\ascii{TestSuite}两者存在共性，但也存在差异。两者类型不兼容，导致目前用例是失败的。通过提取\ascii{TestCase}与\ascii{TestSuite}的共同抽象\ascii{Test}，从而使得用例的组织更加灵活。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{include/mars/core/Test.h}}]
+\begin{nodiff}{include/mars/core/Test.h}
+ \begin{c++}
 struct Test {
   virtual ~Test() {}
   virtual void run() = 0;
 };
  \end{c++}
-\end{leftbar}
+\end{nodiff}
 
-\begin{story}
-  \begin{center}
-    \inlinetitle{抽象的接口类型}
-  \end{center}
+\begin{episode}{抽象的接口类型}
 
 \begin{content}
 
@@ -551,7 +688,6 @@ struct Test {
 
 这是最简单的，也是最抽象的接口类型。它拥有一个最基本的特征，除虚析构函数之外，有且仅有一个纯虚函数。
 
-\begin{leftbar}
  \begin{c++}
 struct Description;
 
@@ -560,13 +696,11 @@ struct SelfDescribing {
   virtual void describeTo(Description& desc) const = 0;
 };
  \end{c++}
-\end{leftbar}
 
 \subsubsection{纯接口类型：无成员变量}
 
 此类接口类型，实际是函数式接口的一个超集。除虚析构函数之外，它可以拥有一个或多个纯虚函数。
 
-\begin{leftbar}
  \begin{c++}
 template <typename T>
 struct Matcher : SelfDescribing {
@@ -574,13 +708,11 @@ struct Matcher : SelfDescribing {
   virtual void describeMismatch(const T& actual, Description& desc) const = 0;
 };
  \end{c++}
-\end{leftbar}
 
 \subsubsection{扩展接口类型：无成员变量}
 
 此类接口类型，是纯接口类型的一个超集。它不仅包含纯虚函数，也包含默认实现的虚函数。甚至，可以提取私有的成员函数。
 
-\begin{leftbar}
  \begin{c++}
 #include "hamcrest/core/Description.h"
 
@@ -593,13 +725,11 @@ struct Matcher : SelfDescribing {
   }
 };
  \end{c++}
-\end{leftbar}
 
 \subsubsection{广义接口类型：存在成员变量}
 
 此类接口类型，是扩展接口类型的一个超集。它可以包含任意类型的成员函数，也包含成员变量。
 
-\begin{leftbar}
  \begin{c++}
 #include <string>
 
@@ -621,18 +751,28 @@ private:
   std::string name;
 };
  \end{c++}
-\end{leftbar}
 
 \end{content}
 
-\end{story}
+\end{episode}
 
 \subsubsection{重构TestCase}
 
 重构\ascii{TestCase}，所有显式声明的成员函数都是\ascii{private}。尤其关注被覆写的\ascii{TestCase::run}，被显式地声明为\ascii{private}，逼迫用户使用抽象接口\ascii{Test::run}，而“面向接口编程”是一种良好的\ascii{OO}设计原则。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{include/mars/core/TestCase.h}}]
+\begin{diff}{include/mars/core/TestCase.h}
+ \begin{minicpp}
+struct TestCase {
+  void run();
+
+private:
+  virtual void setUp() {}
+  virtual void runTest() {}
+  virtual void tearDown() {}
+};
+ \end{minicpp}
+\tcblower
+ \begin{minicpp}
 #include "mars/core/Test.h"
 
 struct TestCase : Test {
@@ -644,15 +784,35 @@ private:
   virtual void runTest() {}
   virtual void tearDown() {}
 };
- \end{c++}
-\end{leftbar}
+ \end{minicpp}
+\end{diff}
 
 \subsubsection{重构TestSuite}
 
 同理，\ascii{TestSuite}也应该被重构使用\ascii{Test}的抽象类型，而非使用\ascii{TestCase}的具体类型。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{include/mars/core/TestSuite.h}}]
+\begin{diff}{include/mars/core/TestSuite.h}
+ \begin{minicpp}
+#include <vector>
+
+struct TestCase;
+
+struct TestSuite {
+  ~TestSuite();
+
+  void add(TestCase* test);
+  void run();
+
+private:
+  template <typename F>
+  void foreach(F f) const;
+
+private:
+  std::vector<TestCase*> tests;
+};
+ \end{minicpp}
+\tcblower
+ \begin{minicpp}
 #include <vector>
 #include "mars/core/Test.h"
 
@@ -670,13 +830,41 @@ private:
 private:
   std::vector<Test*> tests;
 };
- \end{c++}
-\end{leftbar}
+ \end{minicpp}
+\end{diff}
 
 同理，\ascii{TestSuite}的实现也应该使用\ascii{Test}的抽象类型。幸运的是，原来使用\ascii{auto}的自动类型推演，实现文件仅需要修改\ascii{TestSuite::add}函数签名便可以通过测试了。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{src/mars/core/TestSuite.cc}}]
+\begin{diff}{src/mars/core/TestSuite.cc}
+ \begin{minicpp}
+#include "mars/core/TestSuite.h"
+#include "mars/core/TestCase.h"
+
+void TestSuite::add(TestCase* test) {
+  tests.push_back(test);
+}
+
+template <typename F>
+inline void TestSuite::foreach(F f) const {
+  for (auto test : tests) {
+    f(test);
+  }
+}
+
+TestSuite::~TestSuite() {
+  foreach([](auto test) {
+    delete test;
+  });
+}
+
+void TestSuite::run() {
+  foreach([](auto test) {
+    test->run();
+  });
+} 
+ \end{minicpp}
+\tcblower
+ \begin{minicpp}
 #include "mars/core/TestSuite.h"
 
 void TestSuite::add(Test* test) {
@@ -701,12 +889,12 @@ void TestSuite::run() {
     test->run();
   });
 }
- \end{c++}
-\end{leftbar}
+ \end{minicpp}
+\end{diff}
 
-通过\ascii{Test, TestCase, TestSuite}拼装组合，可以方便地构建复杂树形结构的用例图。
+通过\ascii{Test, TestCase, TestSuite}拼装组合，可以方便地构建复杂树形结构的用例图。如\refig{test-tree}所示。
 
-\begin{figure}[H]
+\begin{figure}
 \centering
 \includegraphics[width=0.8\textwidth]{figures/xunit/test-tree.png}
 \caption{组合：构建隐式树}
@@ -719,8 +907,8 @@ void TestSuite::run() {
 
 \subsection{测试用例}
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{test/mars/core/TestCaseSpec.cc}}]
+\begin{nodiff}{test/mars/core/TestCaseSpec.cc}
+ \begin{c++}
 #include <gtest/gtest.h>
 #include "mars/core/TestCase.h"
 
@@ -734,36 +922,61 @@ TEST(NamedTestCase, named_test_case) {
   assertName(TestCase("test case1"), "test case1");
 }
  \end{c++}
-\end{leftbar}
+\end{nodiff}
 
 \subsection{通过测试}
 
 首先，增加抽象接口\ascii{Test::getName}。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{include/mars/core/Test.h}}]
+\begin{diff}{include/mars/core/Test.h}
+ \begin{minicpp}
 #include <string>
 
 struct Test {
-  virtual ~Test() {}
-  virtual const std::string& getName() const = 0;
   virtual void run() = 0;
+  
+  virtual ~Test() {}
 };
- \end{c++}
-\end{leftbar}
+ \end{minicpp}
+ \tcblower
+ \begin{minicpp}
+#include <string>
+
+struct Test {
+  virtual void run() = 0;
+  virtual const std::string& getName() const = 0;
+
+  virtual ~Test() {}
+};
+ \end{minicpp}
+\end{diff}
 
 在\ascii{TestCase}中覆写\ascii{getName}成员函数。其中，为默认构造函数提供空字符串，保证既有的用例都能通过。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{include/mars/core/TestCase.h}}]
+\begin{diff}{include/mars/core/TestCase.h}
+ \begin{minicpp}
+#include "mars/core/Test.h"
+
+struct TestCase : Test {
+private:
+  void run() override;
+
+private:
+  virtual void setUp() {}
+  virtual void runTest() {}
+  virtual void tearDown() {}
+};
+ \end{minicpp}
+\tcblower
+ \begin{minicpp}
 #include "mars/core/Test.h"
 
 struct TestCase : Test {
   explicit TestCase(const std::string& = "");
 
 private:
-  const std::string& getName() const override;
   void run() override;
+  const std::string& getName() const override;
 
 private:
   virtual void setUp() {}
@@ -773,30 +986,65 @@ private:
 private:
   std::string name;
 };
- \end{c++}
-\end{leftbar}
+ \end{minicpp}
+\end{diff}
 
 在\ascii{TestCase.cc}中实现，也极为简单。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{include/mars/core/TestCase.h}}]
+\begin{diff}{src/mars/core/TestCase.cc}
+ \begin{minicpp}
 #include "mars/core/TestCase.h"
 
-TestCase::TestCase(const std::string& name) : name(name) {
+void TestCase::run() {
+  setUp();
+  runTest();
+  tearDown();
+}
+ \end{minicpp}
+\tcblower
+ \begin{minicpp}
+#include "mars/core/TestCase.h"
+
+void TestCase::run() {
+  setUp();
+  runTest();
+  tearDown();
+}
+
+TestCase::TestCase(const std::string& name)
+  : name(name) {
 }
 
 const std::string& TestCase::getName() const {
   return name;
 }
-
-// ...
- \end{c++}
-\end{leftbar}
+ \end{minicpp}
+\end{diff}
 
 依葫芦画瓢，\ascii{TestSuite}的名字实现与\ascii{TestCase}雷同。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{include/mars/core/TestSuite.h}}]
+\begin{diff}{include/mars/core/TestSuite.h}
+ \begin{minicpp}
+#include <vector>
+#include "mars/core/Test.h"
+
+struct TestSuite : Test {
+  ~TestSuite();
+  void add(Test* test);
+
+private:
+  void run() override;
+
+private:
+  template <typename F>
+  void foreach(F f) const;
+
+private:
+  std::vector<Test*> tests;
+};
+ \end{minicpp}
+\tcblower
+ \begin{minicpp}
 #include <vector>
 #include "mars/core/Test.h"
 
@@ -818,23 +1066,74 @@ private:
   std::string name;
   std::vector<Test*> tests;
 };
- \end{c++}
-\end{leftbar}
+ \end{minicpp}
+\end{diff}
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{include/mars/core/TestSuite.h}}]
+在实现文件中，实现相关成员函数。
+
+\begin{diff}{src/mars/core/TestSuite.cc}
+ \begin{minicpp}
 #include "mars/core/TestSuite.h"
 
-TestSuite::TestSuite(const std::string& name) : name(name) {
+void TestSuite::add(Test* test) {
+  tests.push_back(test);
+}
+
+template <typename F>
+inline void TestSuite::foreach(F f) const {
+  for (auto test : tests) {
+    f(test);
+  }
+}
+
+TestSuite::~TestSuite() {
+  foreach([](auto test) {
+    delete test;
+  });
+}
+
+void TestSuite::run() {
+  foreach([](auto test) {
+    test->run();
+  });
+}
+ \end{minicpp}
+\tcblower
+ \begin{minicpp}
+#include "mars/core/TestSuite.h"
+
+void TestSuite::add(Test* test) {
+  tests.push_back(test);
+}
+
+template <typename F>
+inline void TestSuite::foreach(F f) const {
+  for (auto test : tests) {
+    f(test);
+  }
+}
+
+TestSuite::~TestSuite() {
+  foreach([](auto test) {
+    delete test;
+  });
+}
+
+void TestSuite::run() {
+  foreach([](auto test) {
+    test->run();
+  });
+}
+
+TestSuite::TestSuite(const std::string& name)
+  : name(name) {
 }
 
 const std::string& TestSuite::getName() const {
   return name;
 }
-
-// ...
- \end{c++}
-\end{leftbar}
+ \end{minicpp}
+\end{diff}
 
 至此，测试通过。
 
@@ -849,42 +1148,70 @@ const std::string& TestSuite::getName() const {
   \eitem{\ascii{getName}没有必要声明为虚函数，因为在\ascii{Test}内已经完全具备实现的条件；子类强制继承\ascii{getName}的实现，拒绝被覆写。}
 \end{enum}
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{include/mars/core/Test.h}}]
+\begin{diff}{include/mars/core/Test.h}
+ \begin{minicpp}
+#include <string>
+
+struct Test {
+  virtual void run() = 0;
+  virtual const std::string& getName() const = 0;
+
+  virtual ~Test() {}
+};
+ \end{minicpp}
+\tcblower
+ \begin{minicpp}
 #include <string>
 
 struct Test {
   explicit Test(const std::string& name = "");
   const std::string& getName() const;
 
-  virtual ~Test() {}
   virtual void run() = 0;
+  virtual ~Test() {}
 
 private:
   std::string name;
 };
- \end{c++}
-\end{leftbar}
+ \end{minicpp}
+\end{diff}
 
 \ascii{Test::getName}实现异常简单。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{src/mars/core/Test.cc}}]
+\begin{nodiff}{src/mars/core/Test.cc}
+ \begin{c++}
 #include "mars/core/Test.h"
 
-Test::Test(const std::string& name) : name(name) {
-}
+Test::Test(const std::string& name)
+  : name(name) {}
 
 const std::string& Test::getName() const {
   return name;
 }
  \end{c++}
-\end{leftbar}
+\end{nodiff}
 
 在\ascii{TestCase}中，直接使用\ascii{using}语句复用构造函数，删除既有的\ascii{TestCase::getName}实现，及其私有字段\ascii{std::string name}。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{include/mars/core/TestCase.h}}]
+\begin{diff}{include/mars/core/TestCase.h}
+ \begin{minicpp}
+#include "mars/core/Test.h"
+
+struct TestCase : Test {
+  explicit TestCase(const std::string& = "");
+
+private:
+  const std::string& getName() const override;
+  void run() override;
+
+private:
+  virtual void setUp() {}
+  virtual void runTest() {}
+  virtual void tearDown() {}
+};
+ \end{minicpp}
+\tcblower
+ \begin{minicpp}
 #include "mars/core/Test.h"
 
 struct TestCase : Test {
@@ -898,13 +1225,37 @@ private:
   virtual void runTest() {}
   virtual void tearDown() {}
 };
- \end{c++}
-\end{leftbar}
+ \end{minicpp}
+\end{diff}
 
 同理，\ascii{TestSuite}中通过相同的手段实现代码复用。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{include/mars/core/TestSuite.h}}]
+\begin{diff}{include/mars/core/TestSuite.h}
+ \begin{minicpp}
+#include <vector>
+#include "mars/core/Test.h"
+
+struct TestSuite : Test {
+  explicit TestSuite(const std::string& = "");
+  ~TestSuite();subsection
+
+  void add(Testsubsection
+
+private:
+  const std::string& getName() const override;
+  void run() override;
+
+private:
+  template <typename F>
+  void foreach(F f) const;
+
+private:
+  std::string name;
+  std::vector<Test*> tests;
+};
+ \end{minicpp}
+\tcblower
+ \begin{minicpp}
 #include <vector>
 #include "mars/core/Test.h"
 
@@ -925,8 +1276,8 @@ private:
 private:
   std::vector<Test*> tests;
 };
- \end{c++}
-\end{leftbar}
+ \end{minicpp}
+\end{diff}
 
 遗憾的是，\ascii{Test}构造函数未能声明为\ascii{protected}。但是，即使\ascii{Test}的构造函数虽然被声明为\ascii{public}，设计并未丢失编译时的安全检查。因为\ascii{Test::run}被声明为纯虚函数，在编译时保证用户无法直接创建\ascii{Test}实例。
 

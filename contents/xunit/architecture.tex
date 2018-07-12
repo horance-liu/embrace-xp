@@ -26,7 +26,7 @@
 
 \subsection{Google Test}
 
-\ascii{Google Test}出自名家，自带光环。其功能强大，系统稳定，移植性良好，支持用例自动发现机制，相对于社区其它\ascii{xUnit}框架更显技高一筹，在\ascii{C++}社区占据主导地位。但是，\ascii{Google Test}也存在一些不尽人意的细节之处。
+\ascii{Google Test}出自名家，自带光环。其功能强大，系统稳定，移植性良好，支持用例自动发现机制，相对于社区其它\ascii{xUnit}框架更显技高一筹，在\ascii{C++}社区占据主导地位。
 
 \begin{nodiff}{Google Test样例}
  \begin{c++}
@@ -63,75 +63,7 @@ TEST_F(StackSpec, apply_pop_2_time) {
  \end{c++}
 \end{nodiff}
 
-\begin{nodiff}{Google Test样例}
- \begin{c++}
-#include <gtest/gtest.h>
-#include <stack>
-
-namespace {
-  struct StackSpec : testing::Test {
-  private:
-    void SetUp() override {
-      s.push(1);
-      s.push(2);
-    }
-
-  protected:
-    std::stack<int> s;
-  };
-}
-
-TEST_F(StackSpec, apply_pop_0_time) {
-  ASSERT_EQ(2, s.top());
-}
-
-TEST_F(StackSpec, apply_pop_1_time) {
-  s.pop();
-  ASSERT_EQ(1, s.top());
-}
-
-TEST_F(StackSpec, apply_pop_2_time) {
-  s.pop();
-  s.pop();
-  ASSERT_TRUE(s.empty());
-}
- \end{c++}
-\end{nodiff}
-
-\begin{nodiff}{Google Test样例}
- \begin{c++}
-#include <gtest/gtest.h>
-#include <stack>
-
-namespace {
-  struct StackSpec : testing::Test {
-  private:
-    void SetUp() override {
-      s.push(1);
-      s.push(2);
-    }
-
-  protected:
-    std::stack<int> s;
-  };
-}
-
-TEST_F(StackSpec, apply_pop_0_time) {
-  ASSERT_EQ(2, s.top());
-}
-
-TEST_F(StackSpec, apply_pop_1_time) {
-  s.pop();
-  ASSERT_EQ(1, s.top());
-}
-
-TEST_F(StackSpec, apply_pop_2_time) {
-  s.pop();
-  s.pop();
-  ASSERT_TRUE(s.empty());
-}
- \end{c++}
-\end{nodiff}
+但是，\ascii{Google Test}也存在一些不尽人意的细节之处。
 
 \subsubsection{命名}
 
@@ -139,14 +71,14 @@ TEST_F(StackSpec, apply_pop_2_time) {
 
 当用例命名成为程序员的一种负担，其质量将大大折扣。但是，测试用例是系统行为描述最重要的活“文档”，它与被测系统的代码一并入库，并保持同步。如果，测试用例命名质量不高，\ascii{"Test as Document"}的愿景只能沦为痴人说梦了。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{坏味道：使用标识符命名用例}}]
-// Bad Smell: test name .
+\begin{nodiff}{坏味道：使用标识符命名用例}
+ \begin{c++}
+// Bad Smell: test cases must be named using c++ identifier.
 TEST_F(RobotCleanerTest, at_beginning_the_robot_should_be_in_at_the_initial_position) {
   ASSERT_EQ(Position(0, 0, NORTH), robot.getPosition());
 }
  \end{c++}
-\end{leftbar}
+\end{nodiff}
 
 \subsubsection{重复}
 
@@ -156,13 +88,14 @@ TEST_F(RobotCleanerTest, at_beginning_the_robot_should_be_in_at_the_initial_posi
 
 一般地，在\cpp{}编译模型中，头文件中定义类，实现文件中定义成员函数。但是，此处测试装置与测试用例已经在同一个文件内，分离定义而导致重复引入\ascii{RobotCleanerTest}，显然给用户增加无畏的负担。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{缺乏内聚：测试装置与测试用例相分离，重复设计}}]
+\begin{nodiff}{重复设计：测试装置与测试用例相分离}
+ \begin{c++}
 struct RobotCleanerTest : testing::Test {
 protected:
   RobotCleaner robot;
 };
  
+// Bad Smell: you must duplicate fixture name for each test case.
 TEST_F(RobotCleanerTest, at_beginning_the_robot_should_be_in_at_the_initial_position) {
   ASSERT_EQ(Position(0, 0, NORTH), robot.getPosition());
 }
@@ -172,7 +105,7 @@ TEST_F(RobotCleanerTest, robot_should_be_face_west_after_turn_left) {
   ASSERT_EQ(Position(0, 0, WEST), robot.getPosition());
 }
   \end{c++}
-\end{leftbar}
+\end{nodiff}
 
 \subsubsection{隐晦}
 
@@ -180,10 +113,10 @@ TEST_F(RobotCleanerTest, robot_should_be_face_west_after_turn_left) {
 
 不幸的是，\ascii{RobotCleanerTest}与\ascii{TEST\_F}存在隐晦的继承关系。如果用户不了解\ascii{Google Test}的实现机制，就根本无法理解成员变量\ascii{RobotCleanerTest::robot}为什么是\ascii{protected}，而不是\ascii{private}。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{错误：本应该使用protected，而错误地使用private}}]
+\begin{nodiff}{错误：本应该使用protected，而错误地使用private}
+ \begin{c++}
 struct RobotCleanerTest : testing::Test {
-private:  // Error: should be protected
+private: // Error: should be protected
   RobotCleaner robot;
 };
  
@@ -191,14 +124,14 @@ TEST_F(RobotCleanerTest, at_beginning_the_robot_should_be_in_at_the_initial_posi
   ASSERT_EQ(Position(0, 0, NORTH), robot.getPosition());
 }
   \end{c++}
-\end{leftbar}
+\end{nodiff}
 
 \subsubsection{误用}
 
 用户也需要关注\ascii{TEST， TEST\_F}之间的区别，及其使用场景，无疑增加了用户的心智包袱。例如，用户在此处本应使用\ascii{TEST\_F}，而误用为\ascii{TEST}。这个例子较为幸运，编译器提示\ascii{robot}变量未定义。但是，在特殊场景可能会逃出编译时检查，导致运行时用例失败。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{错误：本应该使用TEST\_F，而错误地使用TEST}}]
+\begin{nodiff}{错误：本应该使用TEST\_F，而错误地使用TEST}
+ \begin{c++}
 struct RobotCleanerTest : testing::Test {
 protected:
   RobotCleaner robot;
@@ -209,17 +142,17 @@ TEST(RobotCleanerTest, at_beginning_the_robot_should_be_in_at_the_initial_positi
   ASSERT_EQ(Position(0, 0, NORTH), robot.getPosition());
 }
   \end{c++}
-\end{leftbar}
+\end{nodiff}
 
 \subsubsection{大小写}
 
 覆写\ascii{Test::SetUp}时，经常将其错误地写为\ascii{setup, setUp, Setup}，不经意地大小写错误可能导致运行时测试用例执行失败。当然，如果坚持使用\ascii{override}关键字，可以提高编译时安全性，将错误拦截至编译期。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{错误：本应该声明为SetUp，而错误地声明为Setup}}]
+\begin{nodiff}{错误：本应该声明为SetUp，而错误地声明为Setup}
+ \begin{c++}
 struct RobotCleanerTest : testing::Test {
 private:
-  // Error: should be SetUp
+  // Error: should override SetUp, not Setup/setup/setUp.
   void Setup() {
     robot.reset();
   }
@@ -228,7 +161,7 @@ protected:
   RobotCleaner robot;
 };
   \end{c++}
-\end{leftbar}
+\end{nodiff}
 
 \subsection{xUnit Mars}
 
@@ -240,8 +173,8 @@ protected:
   \eitem{避免\code{setup/setUp/SetUp}大小写混用而引发错误。}
 \end{enum}
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{xUnit Mars样例}}]
+\begin{nodiff}{xUnit Mars样例}
+ \begin{c++}
 #include <mars/mars.h>
 #include <stack>
 
@@ -269,7 +202,7 @@ FIXTURE(StackSpec) {
   }
 }; 
  \end{c++}
-\end{leftbar}
+\end{nodiff}
 
 \end{content}
 

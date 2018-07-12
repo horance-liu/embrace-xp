@@ -16,59 +16,29 @@
 
 \subsection{系统配置}
 
-\begin{table}[!htb]
-\resizebox{1.0\textwidth}{!} {
-\begin{tabular*}{1.2\textwidth}{@{}ll@{}}
-\toprule
-\ascii{环境} & \ascii{配置与版本} \\
-\midrule
-\ascii{操作系统}  & \ascii{Ubuntu 18.04} \\
-\ascii{编译器} & \ascii{GCC 7.3.0} \\ 
-\ascii{编程语言} & \ascii{C++14} \\ 
-\ascii{构建工具} & \ascii{CMake 3.10, Make 4.1} \\ 
-\ascii{集成开发环境} & \ascii{Eclipse CDT Oxygen.3} \\ 
-\ascii{版本工具} & \ascii{Git 2.17.1} \\ 
-\bottomrule
-\end{tabular*}
-}
-\caption{环境配置}
-\label{tbl:env-configure}
-\end{table}
+\begin{colortable}{X|X|X}{环境配置}
+\emph{名称}                      & \emph{配置}          & \emph{版本}      \\\hline
+\multirow{2}{*}\ascii{操作系统}  & \ascii{Linux Kernel} & \ascii{4.15.0}  \\\cline{2-3}
+                                & \ascii{Ubuntu}       & \ascii{18.04}   \\\hline
+\multirow{2}{*}\ascii{编译器}    & \ascii{GCC}          & \ascii{7.3.0}   \\\cline{2-3}
+                                & \ascii{Clang}        & \ascii{6.0.0}   \\\hline
+\ascii{编程语言} & \ascii{C++}   & \ascii{14}                              \\\hline
+\multirow{2}{*}\ascii{构建工具}  & \ascii{CMake}        & \ascii{3.10}     \\\cline{2-3} 
+                                & \ascii{Make}         & \ascii{4.10}     \\\hline
+\ascii{集成开发环境}              & \ascii{Eclipse CDT}  & \ascii{Oxygen 3} \\\hline 
+\ascii{版本工具}                 & \ascii{Git}          & \ascii{2.17.1}   \\\hline
+\end{colortable}
 
-\begin{nodiff}{Google Test样例}
- \begin{c++}
-#include <gtest/gtest.h>
-#include <stack>
+\subsection{项目组织}
 
-namespace {
-  struct StackSpec : testing::Test {
-  private:
-    void SetUp() override {
-      s.push(1);
-      s.push(2);
-    }
+\ascii{xUnit Mars}项目目录结构如\refig{mars-project}所示。
 
-  protected:
-    std::stack<int> s;
-  };
-}
-
-TEST_F(StackSpec, apply_pop_0_time) {
-  ASSERT_EQ(2, s.top());
-}
-
-TEST_F(StackSpec, apply_pop_1_time) {
-  s.pop();
-  ASSERT_EQ(1, s.top());
-}
-
-TEST_F(StackSpec, apply_pop_2_time) {
-  s.pop();
-  s.pop();
-  ASSERT_TRUE(s.empty());
-}
- \end{c++}
-\end{nodiff}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.6\textwidth]{figures/xunit/mars-project.png}
+\caption{xUnit Mars: 项目组织}
+ \label{fig:mars-project}
+\end{figure}
 
 \begin{episode}{代码风格}
 
@@ -102,23 +72,12 @@ TEST_F(StackSpec, apply_pop_2_time) {
 
 \end{episode}
 
-\subsection{项目组织}
-
-\ascii{xUnit Mars}项目目录结构如\refig{mars-project}所示。
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.6\textwidth]{figures/xunit/mars-project.png}
-\caption{xUnit Mars: 项目组织}
- \label{fig:mars-project}
-\end{figure}
-
 \subsection{构建系统}
 
 \ascii{xUnit Mars}使用\ascii{CMake}构建工具。在项目根目录下，主控\ascii{CMakeLists.txt}完成项目的整体配置，及其子任务的组织。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{CMakeLists.txt}}]
+\begin{nodiff}{CMakeLists.txt}
+ \begin{c++}
 project(mars)                                                                                  
 cmake_minimum_required(VERSION 2.8)
 
@@ -129,45 +88,45 @@ include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include")
 add_subdirectory(src)
 add_subdirectory(test)
  \end{c++}
-\end{leftbar}
+\end{nodiff}
 
 \ascii{src/CMakeLists.txt}完成\ascii{mars}库构建。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{src/CMakeLists.txt}}]
+\begin{nodiff}{src/CMakeLists.txt}
+ \begin{c++}
 file(GLOB_RECURSE all_files *.cc)
 add_library(mars STATIC ${all_files})
  \end{c++}
-\end{leftbar}
+\end{nodiff}
 
 \ascii{test/CMakeLists.txt}完成\ascii{mars-test}应用程序构建，它执行\ascii{xUnit Mars}项目的所有测试用例。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{test/CMakeLists.txt}}]
+\begin{nodiff}{test/CMakeLists.txt}
+ \begin{c++}
 file(GLOB_RECURSE all_files *.cc)
 add_executable(mars-test ${all_files})
 target_link_libraries(mars-test mars gtest gtest_main pthread)
  \end{c++}
-\end{leftbar}
+\end{nodiff}
 
 \subsection{Git库}
 
 在项目根目录下初始化一个空的\ascii{Git}库。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{初始化git库}}] 
+\begin{nodiff}{初始化git库}
+ \begin{c++}
 $ git init
  \end{c++}
-\end{leftbar}  
+\end{nodiff}  
 
 待项目组织完毕，完成第一次代码提交。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{提交代码}}] 
+\begin{nodiff}{提交代码}
+ \begin{c++}
 $ git add -A .
 $ git commit -m"setup project"
  \end{c++}
-\end{leftbar}
+\end{nodiff}
 
 \end{content}
 
@@ -179,8 +138,8 @@ $ git commit -m"setup project"
 
 万事开头难，第一个用例跑起来并不容易。此处设计实现了一个简单的测试用例，用户通过扩展\ascii{xUnit Mars}框架中的\ascii{TestCase}，实现测试用例的增加。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{test/mars/core/TestCaseSpec.cc}}]
+\begin{nodiff}{test/mars/core/TestCaseSpec.cc}
+ \begin{c++}
 #include <gtest/gtest.h>
 #include "mars/core/TestCase.h"
 
@@ -206,7 +165,7 @@ TEST(SimpleTest, make_sure_test_case_can_run_normally) {
   ASSERT_TRUE(test.wasRun);
 }
  \end{c++}
-\end{leftbar}
+\end{nodiff}
 
 \begin{episode}{TDD: 测试驱动开发}
 
@@ -292,45 +251,10 @@ TEST(SimpleTest, make_sure_test_case_can_run_normally) {
 
 \subsection{通过编译}
 
-\begin{nodiff}{Google Test样例}
- \begin{c++}
-#include <gtest/gtest.h>
-#include <stack>
-
-namespace {
-  struct StackSpec : testing::Test {
-  private:
-    void SetUp() override {
-      s.push(1);
-      s.push(2);
-    }
-
-  protected:
-    std::stack<int> s;
-  };
-}
-
-TEST_F(StackSpec, apply_pop_0_time) {
-  ASSERT_EQ(2, s.top());
-}
-
-TEST_F(StackSpec, apply_pop_1_time) {
-  s.pop();
-  ASSERT_EQ(1, s.top());
-}
-
-TEST_F(StackSpec, apply_pop_2_time) {
-  s.pop();
-  s.pop();
-  ASSERT_TRUE(s.empty());
-}
- \end{c++}
-\end{nodiff}
-
 此处引入了多态技术，当\ascii{TestCase::run}启动运行时，将在运行时调用覆写的\ascii{SimpleTest::run}，实现自定义测试用例的执行。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{include/mars/core/TestCase.h}}]
+\begin{nodiff}{include/mars/core/TestCase.h}
+ \begin{c++}
 #ifndef H586108AA_CD7B_459D_8A2F_0DFE6C9720ED
 #define H586108AA_CD7B_459D_8A2F_0DFE6C9720ED
 
@@ -341,7 +265,7 @@ struct TestCase {
 
 #endif
   \end{c++}
-\end{leftbar}
+\end{nodiff}
 
 \begin{episode}{头文件保护宏}
 
@@ -437,11 +361,11 @@ TRAIT(SelfDescribing) {
 
 创建一个空的\ascii{TestCase.cc}文件，这里仅为了\ascii{libmars.a}不为空，保证\ascii{CMake}构建系统工作正常；否则，\ascii{CMake}提示\ascii{mars}项目为空，无法构建\ascii{libmars.a}库。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{src/mars/core/TestCase.cc}}]
+\begin{nodiff}{src/mars/core/TestCase.cc}
+ \begin{c++}
 #include "mars/core/TestCase.h"
  \end{c++}
-\end{leftbar}
+\end{nodiff}
 
 \begin{episode}{多屏编辑}
 
@@ -470,18 +394,18 @@ TRAIT(SelfDescribing) {
 
 在\ascii{build}临时目录中，使用\ascii{cmake}构建工程。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{构建工程}}]
+\begin{nodiff}{构建工程}
+ \begin{c++}
 $ mkdir -p build && cd build
 $ cmake ..
 $ make
  \end{c++}
-\end{leftbar}
+\end{nodiff}
 
 运行测试。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{运行测试}}]
+\begin{nodiff}{运行测试}
+ \begin{c++}
 $ test/mars-test
 Running main() from gtest_main.cc
 [==========] Running 1 test from 1 test case.
@@ -495,7 +419,7 @@ Running main() from gtest_main.cc
 [==========] 1 test from 1 test case ran. (0 ms total)
 [  PASSED  ] 1 test.
  \end{c++}
-\end{leftbar}
+\end{nodiff}
 
 
 
@@ -505,9 +429,9 @@ Running main() from gtest_main.cc
 
 \ascii{CMake}在临时目录\ascii{build}中完成系统构建，为了避免不经意地将\ascii{build}目录提交至\ascii{Git}库，常常需要在\ascii{.gitignore}文件中配置相应的忽略模式。
 
-但是，为每个项目都创建一个\ascii{.gitignore}文件，显然是一种重复设计。因此，配置全局忽略模式是一个更恰当的解决方案。例如，在我的系统中配置如下。
+但是，为每个项目都创建一个\ascii{.gitignore}文件，显然是一种重复设计。因此，配置全局忽略模式是一个更恰当的解决方案。
 
- \begin{c++}[caption={\ttfamily{Git：配置全局忽略模式}}]
+ \begin{c++}
 $ git config --global core.excludesfile ~/.gitignore_global
 $ vi ~/.gitignore_global
 # cmake
@@ -532,12 +456,12 @@ output/
 
 每当通过测试后，立即提交代码到\ascii{Git}库。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{提交代码}}]
+\begin{nodiff}{提交代码}
+ \begin{c++}
 $ git add -A .
 $ git commit -m"pass first test case"
  \end{c++}
-\end{leftbar}
+\end{nodiff}
 
 \begin{episode}{后悔药}
 
@@ -547,9 +471,7 @@ $ git commit -m"pass first test case"
 
 养成经常性提交代码至\ascii{Git}库，是一种良好的编程习惯。在\ascii{TDD}的一个迭代循环中，每当编译通过，链接通过，测试通过，关键重构成功，都应立即执行\ascii{git add}。当设计重构至相对合理状态，最后执行\ascii{git commit}入库，完成一次\ascii{TDD}的闭环。
 
-此外，借助于\ascii{Git}，随时可以吃后悔药。当尝试某种重构设计时，没有达到预期效果，则可以轻松回到上一个稳定状态，重新开始尝试新的努力。
-
-以“重命名函数”的重构过程为例，讲述\ascii{Git}的操作。
+此外，借助于\ascii{Git}，随时可以吃后悔药。当尝试某种重构设计时，没有达到预期效果，则可以轻松回到上一个稳定状态，重新开始尝试新的努力。以“重命名函数”的重构过程为例，讲述\ascii{Git}的操作。
 
 \begin{enum}
   \eitem{新建一个函数；}

@@ -14,11 +14,11 @@
 
 \begin{content}
 
-一般地，在执行测试前需要预置\ascii{setUp}实施测试环境的初始化工作，完成资源的准备。对既有的用例实施重构。
+一般地，在执行测试前需要预置\ascii{setUp}，执行测试环境的初始化工作，完成测试资源的准备。对既有的用例实施重构。
 
 \subsection{测试用例}
 
-\begin{topdiff}{test/mars/core/TestCaseSpec.cc}
+\begin{diff}{test/mars/core/TestCaseSpec.cc}
  \begin{minicpp}
 #include <gtest/gtest.h>
 #include "mars/core/TestCase.h"
@@ -74,65 +74,8 @@ TEST(SimpleTest, make_sure_test_case_can_run_normally) {
   ASSERT_TRUE(test.wasRun);
 }
  \end{minicpp} 
-\end{topdiff}
+\end{diff}
 
-\begin{lastdiff}
- \begin{c++}
-#include <gtest/gtest.h>
-#include "mars/core/TestCase.h"
-
-namespace {
-  struct SimpleTest : TestCase {
-    bool wasRun = false;
-
-  private:
-    void run() override {
-      wasRun = true;
-    }
-  };
-
-  void run(TestCase& test) {
-    test.run();
-  }
-}
-
-TEST(SimpleTest, make_sure_test_case_can_run_normally) {
-  SimpleTest test;
-  run(test);
-
-  ASSERT_TRUE(test.wasRun);
-}
- \end{c++}
-\tcblower
- \begin{c++}
-#include <gtest/gtest.h>
-#include "mars/core/TestCase.h"
-
-namespace {
-  struct SimpleTest : TestCase {
-    bool wasSetUp = false;
-    bool wasRun = false;
-
-  private:
-    void setUp() override {
-      wasSetUp = true;
-    }
-
-    void runTest() override {
-      wasRun = true;
-    }
-  };
-}
-
-TEST(SimpleTest, make_sure_test_case_can_run_normally) {
-  SimpleTest test;
-  test.run();
-
-  ASSERT_TRUE(test.wasSetUp);
-  ASSERT_TRUE(test.wasRun);
-}
- \end{c++} 
-\end{lastdiff}
 
 被覆写的\ascii{SimpleTest::setUp, SimpleTest::runTest}成员函数被显式声明为\ascii{override}与\ascii{private}。前者在编译时完成函数签名的合法性检查，后者限制外部用户使用\ascii{SimpleTest}对象直接调用\ascii{setUp, runTest}成员函数。
 
@@ -141,9 +84,11 @@ TEST(SimpleTest, make_sure_test_case_can_run_normally) {
 
 \subsubsection{按接口编程}
 
-一般地，在面向对象程序设计中，需要遵循“按接口类型编程”的基本设计原则。在\ascii{C++}设计语言中，接口(或抽象基类)使用虚函数声明抽象函数，子类使用\ascii{override}覆写虚函数。在编译时，编译期按照抽象的接口类型确定函数调用关系；在运行时，根据对象的具体类型在相应的虚表中检索对应的成员函数，完成运行时多态的调用。
+一般地，在面向对象程序设计中，需要遵循“按接口类型编程”的基本设计原则。在\ascii{C++}设计语言中，基类使用虚函数声明抽象函数，子类使用\ascii{override}覆写虚函数。
 
-因此，除非存在特殊的需求，将\ascii{override}函数\ascii{private}化，以明确对外声明：在编译时，无法通过该具体类型实现对\ascii{override}函数的直接调用；推荐使用抽象的接口类型或基类型，在运行时实现多态调用。
+在编译时，编译器按照基类的接口类型确定函数调用关系。而在运行时，根据对象的具体类型在相应的虚表中检索对应的成员函数，完成运行时多态的调用。
+
+因此，除非存在特殊的需求，将\ascii{override}函数\ascii{private}化，以明确对外声明：在编译时，无法通过该具体类型实现对\ascii{override}函数的直接调用；推荐使用抽象的基类型，在运行时实现多态调用。
 
 \subsubsection{例外}
 
@@ -156,19 +101,26 @@ TEST(SimpleTest, make_sure_test_case_can_run_normally) {
 
 重构\ascii{TestCase}，仅公开\ascii{run}方法，并移除运行时多态的特性，它负责组织用例执行运行时的算法骨架。搬迁运行时多态行为至私有的两个虚函数，用户根据自己的场景定制\ascii{setUp}与\ascii{runTest}，分别完成测试准备，及其测试执行。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{include/mars/core/TestCase.h}}]
+\begin{diff}{include/mars/core/TestCase.h}
+ \begin{minicpp}
 struct TestCase {
+  virtual void run() = 0;
   virtual ~TestCase() {}
-
+}; 
+ \end{minicpp}
+\tcblower
+ \begin{minicpp}
+struct TestCase {
   void run();
+  virtual ~TestCase() {}
 
 private:
   virtual void setUp() {}
   virtual void runTest() {}
 };
-  \end{c++}
-\end{leftbar}
+ \end{minicpp} 
+\end{diff}
+
 
 \begin{episode}{善用快捷键}
 \begin{content}
@@ -283,16 +235,27 @@ private:
 
 实现\ascii{TestCase::run}的主体逻辑。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{src/mars/core/TestCase.cc}}]
+\begin{nodiff}{include/mars/core/TestCase.h, src/mars/core/TestCase.cc}
+ \begin{c++}
+struct TestCase {
+  void run();
+  virtual ~TestCase() {}
+
+private:
+  virtual void setUp() {}
+  virtual void runTest() {}
+};
+ \end{c++}
+\tcblower
+ \begin{c++}
 #include "mars/core/TestCase.h"
 
 void TestCase::run() {
   setUp();
   runTest();
 }
- \end{c++}
-\end{leftbar}
+ \end{c++} 
+\end{nodiff}
 
 测试通过。
 
@@ -306,8 +269,39 @@ void TestCase::run() {
 
 同理，测试执行后使用\ascii{tearDown}完成现场清理，释放资源。用户通过定制私有的虚函数\ascii{tearDown}完成此功能。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{test/mars/core/TestCaseSpec.cc}}]
+\newpage
+
+\begin{diff}{test/mars/core/TestCaseSpec.cc}
+ \begin{minicpp}
+#include <gtest/gtest.h>
+#include "mars/core/TestCase.h"
+
+namespace {
+  struct SimpleTest : TestCase {
+    bool wasSetUp = false;
+    bool wasRun = false;
+
+  private:
+    void setUp() override {
+      wasSetUp = true;
+    }
+
+    void runTest() override {
+      wasRun = true;
+    }
+  };
+}
+
+TEST(SimpleTest, make_sure_test_case_can_run_normally) {
+  SimpleTest test;
+  test.run();
+
+  ASSERT_TRUE(test.wasSetUp);
+  ASSERT_TRUE(test.wasRun);
+}
+ \end{minicpp}
+\tcblower
+ \begin{minicpp}
 #include <gtest/gtest.h>
 #include "mars/core/TestCase.h"
 
@@ -340,8 +334,8 @@ TEST(SimpleTest, make_sure_test_case_can_run_normally) {
   ASSERT_TRUE(test.wasRun);
   ASSERT_TRUE(test.wasTearDown);  
 }
- \end{c++}
-\end{leftbar}
+ \end{minicpp} 
+\end{diff}
 
 \begin{episode}{struct与class}
 \begin{content}
@@ -494,27 +488,46 @@ private:
 
 当用例执行完成后，\ascii{TestCase::tearDown}负责清理现场。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{include/mars/core/TestCase.h}}]
+\begin{diff}{include/mars/core/TestCase.h}
+ \begin{minicpp}
 struct TestCase {
+  void run();
   virtual ~TestCase() {}
 
+private:
+  virtual void setUp() {}
+  virtual void runTest() {}
+};
+  \end{minicpp}
+\tcblower
+ \begin{minicpp}
+struct TestCase {
   void run();
+  virtual ~TestCase() {}
 
 private:
   virtual void setUp() {}
   virtual void runTest() {}
   virtual void tearDown() {}
 };
-  \end{c++}
-\end{leftbar}
+  \end{minicpp}
+\end{diff}
 
 \subsection{通过测试}
 
 至此，完成了运行一个用例的主干逻辑，但缺乏异常处理机制，留待后续处理。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{src/mars/core/TestCase.cc}}]
+\begin{diff}{src/mars/core/TestCase.cc}
+ \begin{minicpp}
+#include "mars/core/TestCase.h"
+
+void TestCase::run() {
+  setUp();
+  runTest();
+}
+  \end{minicpp}
+\tcblower
+ \begin{minicpp}
 #include "mars/core/TestCase.h"
 
 void TestCase::run() {
@@ -522,14 +535,8 @@ void TestCase::run() {
   runTest();
   tearDown();
 }
- \end{c++}
-\end{leftbar}
-
-\end{content}
-
-\section{算法骨架}
-
-\begin{content}
+  \end{minicpp}
+\end{diff}
 
 \ascii{TestCase::run}实现了\ascii{xUnit}最核心的高层算法逻辑，实现了高层算法逻辑与底层实现细节的解耦，并且实现了高层算法逻辑的高度复用。如\refig{simple-test}所示。
 
@@ -546,10 +553,47 @@ void TestCase::run() {
 
 \subsubsection{测试用例}
 
-\ascii{TestCaseRunner}构建高层算法逻辑，而\ascii{TestCase}作为\ascii{TestCaseRunner}的抽象策略。新增测试用时，覆写\ascii{TestCase}相关接口，完成具体实现细节。实现\ascii{TestCaseRunner}的高层算法逻辑与\ascii{SimpleTest}的具体实现细节之间关系的解耦。
+相对于模板方法，此处需要额外地引入\ascii{TestCaseRunner}。
 
-\begin{leftbar}
- \begin{c++}
+\begin{diff}{test/mars/core/TestCaseSpec.cc(左：模板方法；右：策略模式)}
+ \begin{minicpp}
+#include <gtest/gtest.h>
+#include "mars/core/TestCase.h"
+
+namespace {
+  struct SimpleTest : TestCase {
+    bool wasSetUp = false;
+    bool wasRun = false;
+    bool wasTearDown = false;
+
+  private:
+    void setUp() override {
+      wasSetUp = true;
+    }
+
+    void runTest() override {
+      wasRun = true;
+    }
+
+    void tearDown() override {
+      wasTearDown = true;
+    }
+  };
+}
+
+TEST(SimpleTest, make_sure_test_case_can_run_normally) {
+  SimpleTest test;
+  test.run();
+
+  ASSERT_TRUE(test.wasSetUp);
+  ASSERT_TRUE(test.wasRun);
+  ASSERT_TRUE(test.wasTearDown);  
+} \end{minicpp}
+\tcblower
+ \begin{minicpp}
+#include <gtest/gtest.h>
+#include "mars/core/TestCase.h"
+
 namespace {
   struct SimpleTest : TestCase {
     bool wasSetUp = false;
@@ -573,63 +617,115 @@ namespace {
 
 TEST(SimpleTest, run_test_case_using_strategry) {
   SimpleTest test;
-  TestRunner runner(test);
-  runner.run();
+  TestRunner(test).run();
 
   ASSERT_TRUE(test.wasSetUp);
   ASSERT_TRUE(test.wasRun);
   ASSERT_TRUE(test.wasTearDown);  
 }
- \end{c++}
-\end{leftbar}
+ \end{minicpp} 
+\end{diff}
 
 \subsubsection{通过测试}
 
-\ascii{TestRunner::run}负责组织高层算法逻辑，算法子步骤的实现通过抽象的\ascii{TestCase}委托给某个具体策略对象完成。从而实现了\ascii{TestCaseRunner}与\ascii{SimpleTest}之间的解耦，两者都依赖于抽象的\ascii{TestCase}，如\refig{simple-test-strategry}所示。
+两种实现方法差异非常明显。
 
-\begin{figure}[H]
-\centering
-\includegraphics[width=1.0\textwidth]{figures/xunit/simple-test-strategry.png}
-\caption{策略对象：定义算法骨架}
- \label{fig:simple-test-strategry}
-\end{figure}
+\begin{enum}
+  \eitem{模板方法}
+\begin{enum}
+  \eitem{使用继承，子类覆写算法子步骤；}
+  \eitem{抽象基类\code{TestCase}组织高层算法逻辑，该方法对外公开；}  
+  \eitem{抽象基类\code{TestCase}使用\code{private}声明抽象的算法子步骤。}  
+\end{enum}
+  \eitem{策略模式}
+\begin{enum}
+  \eitem{使用委托，策略对象覆写算法子步骤；}
+  \eitem{额外引入具体类\code{TestCaseRunner}，负责组织高层算法逻辑；}  
+  \eitem{\code{TestCase}成为\code{TestCaseRunner}的一个抽象策略；}
+  \eitem{\code{TestCase}使用\code{public}声明抽象的算法子步骤。}
+\end{enum}
+\end{enum}
 
-
-\begin{leftbar}
- \begin{c++}
+\begin{diff}{include/mars/core/TestCase.h(左：模板方法；右：策略模式)}
+ \begin{minicpp}
 struct TestCase {
+  void run();  
   virtual ~TestCase() {}
-
+  
+private:
   virtual void setUp() {}
   virtual void runTest() {}
   virtual void tearDown() {}
 };
+\end{minicpp}
+\tcblower
+ \begin{minicpp}
+struct TestCase {
+  virtual void setUp() {}
+  virtual void runTest() {}
+  virtual void tearDown() {}
+
+  virtual ~TestCase() {}
+}; 
 
 struct TestCaseRunner {
-  TestCaseRunner(TestCase& test) : test(test) {
-  }
-
-  void run() {
-    test.setUp();
-    test.runTest();
-    test.tearDown();
-  }
+  TestCaseRunner(TestCase& test);
+  void run();
 
 private:
   TestCase& test;
 };
- \end{c++}
-\end{leftbar}
+\end{minicpp} 
+\end{diff}
 
-\subsection{权衡利弊}
+\begin{diff}{src/mars/core/TestCase.cc(左：模板方法；右：策略模式)}
+ \begin{minicpp}
+#include "mars/core/TestCase.h"
+
+void TestCase::run() {
+  setUp();
+  runTest();
+  tearDown();
+};
+\end{minicpp}
+\tcblower
+ \begin{minicpp}
+#include "mars/core/TestCase.h"
+
+TestCaseRunner::TestCaseRunner(TestCase& test)
+  : test(test) {}
+
+void TestCaseRunner::run() {
+  test.setUp();
+  test.runTest();
+  test.tearDown();
+}
+\end{minicpp} 
+\end{diff}
+
+\subsection{设计权衡}
 
 使用模板方法，\ascii{SimpleTest}通过继承方式直接复用了\ascii{TestCase::run}高层算法逻辑。但继承是一种强依赖，增强了\ascii{SimpleTest}与\ascii{TestCase}之间的耦合关系。
 
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.4\textwidth]{figures/xunit/simple-test.png}
+\caption{模板方法：使用继承}
+ \label{fig:simple-test}
+\end{figure}
+
 使用策略方法，\ascii{TestCaseRunner}高层算法逻辑与\ascii{SimpleTest}是解耦的，但额外地引入类\ascii{TestCaseRunner}。
 
-既然两个方案都有优缺点，到底应该采用哪个方案呢？其一，使用策略方法，需要建立额外的委托关系，不仅增加过多的类，使得设计变得更加复杂。其二，观察\ascii{TestCaseRunner::run}的实现，其实现基本完全委托给了\ascii{TestCase}；按照迪米特法则，这段高层算法逻辑应该归属于\ascii{TeseCase}。
+\begin{figure}[H]
+\centering
+\includegraphics[width=1.0\textwidth]{figures/xunit/simple-test-strategry.png}
+\caption{策略对象：使用委托}
+ \label{fig:simple-test-strategry}
+\end{figure}
 
-\begin{leftbar}
+既然两个方案都有优缺点，到底应该采用哪个方案呢？如果优选模板方法，其一，使用策略方法，需要建立额外的委托关系，不仅增加了类的数目，而且因''中间人''的委托关系使得设计变得更加复杂。其二，观察\ascii{TestCaseRunner::run}的实现，其实现基本完全委托给了\ascii{TestCase}。
+
+\begin{nodiff}{src/mars/core/TestCase.cc：中间人}
 \begin{c++}
 void TestCaseRunner::run() {
   test.setUp();
@@ -637,12 +733,12 @@ void TestCaseRunner::run() {
   test.tearDown();
 }
 \end{c++}
-\end{leftbar}
+\end{nodiff}
 
-按照这个推理，实施重构将\ascii{TestCaseRunner::run}搬迁至\ascii{TestCase}，\ascii{TestCaseRunner}就成为一个空类，根本就没有存在的理由。因此，按照迪米特法则，也应优选模板方法。
+按照迪米特法则，这段高层算法逻辑应该搬迁至\ascii{TeseCase}。依据实施重构将\ascii{TestCaseRunner::run}搬迁至\ascii{TestCase::run}。此时\ascii{TestCaseRunner}就成为一个空类，根本就没有存在的理由。因此，按照迪米特法则，也应优选模板方法。
 
-如果优选模板方法，那么需要分析一下此场景使用模板方法的带来的副作用。无非就是因为引入继承关系从而增强了\ascii{TestCase}与\ascii{SimpleTest}的耦合关系。但是，考虑到\ascii{SimpleTest}是\ascii{xUnit Mars}最小调度单位，不会进一步被继承或组合而被复用，这个耦合关系仅局部于\ascii{SimpleTest}内部，不会被传播到其他地方，这是完全可以接受的设计。
+如果优选模板方法，因引入继承从而增强了\ascii{TestCase}与\ascii{SimpleTest}的耦合关系。但是，考虑到\ascii{SimpleTest}是\ascii{xUnit Mars}最小调度单位，相对稳定，变化不大。也就是说，两者之间的耦合关系仅局部于\ascii{SimpleTest}内部，不会被传播到其他地方，满足局部化原则，这是完全可以接受的设计。
 
-
+我们的结论：此时此案例应优选\emph{模板方法}。
 
 \end{content}
