@@ -1,0 +1,585 @@
+
+第一个测试用例。
+
+\begin{nodiff}{test/mars/core/WasRun.cc}
+\begin{c++}
+TEST(WasRunSpec, run_test) {
+  WasRun test;
+
+  ASSERT_FALSE(test.wasRun);
+  test.testMethod();
+  ASSERT_TRUE(test.wasRun);
+}
+\end{c++}
+\end{nodiff}
+
+快速通过测试用例。
+
+\begin{diff}{test/mars/core/WasRun.cc}
+\begin{minicpp}
+TEST(WasRunSpec, run_test) {
+  WasRun test;
+
+  ASSERT_FALSE(test.wasRun);
+  test.testMethod();
+  ASSERT_TRUE(test.wasRun);
+}
+\end{minicpp}
+\tcblower
+\begin{minicpp}
+#include <gtest/gtest.h>
+
+namespace {
+  struct WasRun {
+    bool wasRun = false;
+
+    void testMethod() {
+      wasRun = true;
+    }
+  };
+}
+
+TEST(WasRunSpec, run_test) {
+  WasRun test;
+
+  ASSERT_FALSE(test.wasRun);
+  test.testMethod();
+  ASSERT_TRUE(test.wasRun);
+}
+\end{minicpp}
+\end{diff}
+
+泛化测试方法的执行，并伪实现快速通过测试。
+
+\begin{diff}{test/mars/core/WasRun.cc}
+\begin{minicpp}
+#include <gtest/gtest.h>
+
+namespace {
+  struct WasRun {
+    bool wasRun = false;
+
+    void testMethod() {
+      wasRun = true;
+    }
+  };
+}
+
+TEST(WasRunSpec, run_test) {
+  WasRun test;
+
+  ASSERT_FALSE(test.wasRun);
+  test.testMethod();
+  ASSERT_TRUE(test.wasRun);
+}\end{minicpp}
+\tcblower
+\begin{minicpp}
+#include <gtest/gtest.h>
+
+namespace {
+  struct WasRun {
+    bool wasRun = false;
+
+    WasRun(void(WasRun::*)()) {
+    }
+
+    void run() {
+      testMethod();
+    }
+
+    void testMethod() {
+      wasRun = true;
+    }
+
+    void testAnotherMethod() {
+      wasRun = false;
+    }
+  };
+}
+
+TEST(WasRunSpec, make_sure_test_method_was_ran) {
+  WasRun test(&WasRun::testMethod);
+
+  ASSERT_FALSE(test.wasRun);
+  test.run();
+  ASSERT_TRUE(test.wasRun);
+}
+\end{minicpp}
+\end{diff}
+
+显示实现，去除伪实现。
+
+\begin{diff}{test/mars/core/WasRun.cc}
+\begin{minicpp}
+#include <gtest/gtest.h>
+
+namespace {
+  struct WasRun {
+    bool wasRun = false;
+
+    WasRun(void(WasRun::*)()) {
+    }
+
+    void run() {
+      testMethod();
+    }
+
+    void testMethod() {
+      wasRun = true;
+    }
+
+    void testAnotherMethod() {
+      wasRun = false;
+    }
+  };
+}
+
+TEST(WasRunSpec, make_sure_test_method_was_ran) {
+  WasRun test(&WasRun::testMethod);
+
+  ASSERT_FALSE(test.wasRun);
+  test.run();
+  ASSERT_TRUE(test.wasRun);
+}
+\end{minicpp}
+\tcblower
+\begin{minicpp}
+#include <gtest/gtest.h>
+
+namespace {
+  struct WasRun {
+    bool wasRun = false;
+
+    WasRun(void(WasRun::*method)()) : method(method) {
+    }
+
+    void run() {
+      (this->*method)();
+    }
+
+    void testMethod() {
+      wasRun = true;
+    }
+
+  private:
+    void(WasRun::*method)() ;
+  };
+}
+
+TEST(WasRunSpec, make_sure_test_method_was_ran) {
+  WasRun test(&WasRun::testMethod);
+
+  ASSERT_FALSE(test.wasRun);
+  test.run();
+  ASSERT_TRUE(test.wasRun);
+}
+\end{minicpp}
+\end{diff}
+
+消除重复，提高表达力。
+
+\begin{diff}{test/mars/core/WasRun.cc}
+\begin{minicpp}
+#include <gtest/gtest.h>
+
+namespace {
+  struct WasRun {
+    bool wasRun = false;
+
+    WasRun(void(WasRun::*method)()) : method(method) {
+    }
+
+    void run() {
+      (this->*method)();
+    }
+
+    void testMethod() {
+      wasRun = true;
+    }
+
+  private:
+    void(WasRun::*method)() ;
+  };
+}
+
+TEST(WasRunSpec, make_sure_test_method_was_ran) {
+  WasRun test(&WasRun::testMethod);
+
+  ASSERT_FALSE(test.wasRun);
+  test.run();
+  ASSERT_TRUE(test.wasRun);
+}
+\end{minicpp}
+\tcblower
+\begin{minicpp}
+#include <gtest/gtest.h>
+
+namespace {
+  struct WasRun {
+    bool wasRun = false;
+
+    using Method = void(WasRun::*)();
+
+    WasRun(Method method) : method(method) {
+    }
+
+    void run() {
+      (this->*method)();
+    }
+
+    void testMethod() {
+      wasRun = true;
+    }
+
+  private:
+    Method method;
+  };
+}
+
+TEST(WasRunSpec, make_sure_test_method_was_ran) {
+  WasRun test(&WasRun::testMethod);
+
+  ASSERT_FALSE(test.wasRun);
+  test.run();
+  ASSERT_TRUE(test.wasRun);
+}
+\end{minicpp}
+\end{diff}
+
+增加另外一个测试用例，模拟测试断言失败。测试方法执行之后，断言测试是失败的。
+
+\begin{nodiff}
+\begin{c++}
+#include <gtest/gtest.h>
+
+namespace {
+  struct WasFail {
+    bool wasFail = true;
+
+    using Method = void(WasFail::*)();
+
+    WasFail(Method method) : method(method) {
+    }
+
+    void run() {
+      (this->*method)();
+    }
+
+    void testMethod() {
+      wasFail = false;
+    }
+
+  private:
+    Method method;
+  };
+}
+
+TEST(WasFailSpec, make_sure_test_method_was_fail) {
+  WasFail test(&WasFail::testMethod);
+
+  ASSERT_TRUE(test.wasFail);
+  test.run();
+  ASSERT_FALSE(test.wasFail);
+}
+\end{c++}
+\end{nodiff}
+
+提取基类。
+
+\begin{nodiff}
+\begin{c++}
+#ifndef H91BC959A_7D3D_4A69_BB1C_F60DA2CC83D2
+#define H91BC959A_7D3D_4A69_BB1C_F60DA2CC83D2
+
+template <typename Self>
+struct TestCase {
+protected:
+  using Method = void(Self::*)();
+
+public:
+  TestCase(Self& self, Method method)
+    : self(self), method(method) {}
+
+  void run() {
+    (self.*method)();
+  }
+
+private:
+  Self& self;
+  Method method;
+};
+
+#endif
+\end{c++}
+\end{nodiff}
+
+\begin{diff}{test/mars/core/WasRun.cc}
+\begin{minicpp}
+#include <gtest/gtest.h>
+
+namespace {
+  struct WasRun {
+    bool wasRun = false;
+
+    using Method = void(WasRun::*)();
+
+    WasRun(Method method) : method(method) {
+    }
+
+    void run() {
+      (this->*method)();
+    }
+
+    void testMethod() {
+      wasRun = true;
+    }
+
+  private:
+    Method method;
+  };
+}
+
+TEST(WasRunSpec, make_sure_test_method_was_ran) {
+  WasRun test(&WasRun::testMethod);
+
+  ASSERT_FALSE(test.wasRun);
+  test.run();
+  ASSERT_TRUE(test.wasRun);
+}
+\end{minicpp}
+\tcblower
+\begin{minicpp}
+#include <gtest/gtest.h>
+#include <mars/core/TestCase.h>
+
+namespace {
+  struct WasRun : TestCase<WasRun> {
+    bool wasRun = false;
+
+    WasRun(Method method) : TestCase(*this, method) {
+    }
+
+    void testMethod() {
+      wasRun = true;
+    }
+  };
+}
+
+TEST(WasRunSpec, make_sure_test_method_was_ran) {
+  WasRun test(&WasRun::testMethod);
+
+  ASSERT_FALSE(test.wasRun);
+  test.run();
+  ASSERT_TRUE(test.wasRun);
+}
+\end{minicpp}
+\end{diff}
+
+重构WasFail。
+
+\begin{diff}{test/mars/core/WasRun.cc}
+\begin{minicpp}
+#include <gtest/gtest.h>
+
+namespace {
+  struct WasFail {
+    bool wasFail = true;
+
+    using Method = void(WasFail::*)();
+
+    WasFail(Method method) : method(method) {
+    }
+
+    void run() {
+      (this->*method)();
+    }
+
+    void testMethod() {
+      wasFail = false;
+    }
+
+  private:
+    Method method;
+  };
+}
+
+TEST(WasFailSpec, make_sure_test_method_was_fail) {
+  WasFail test(&WasFail::testMethod);
+
+  ASSERT_TRUE(test.wasFail);
+  test.run();
+  ASSERT_FALSE(test.wasFail);
+}
+\end{minicpp}
+\tcblower
+\begin{minicpp}
+#include <gtest/gtest.h>
+#include <mars/core/TestCase.h>
+
+namespace {
+  struct WasRun : TestCase<WasRun> {
+    bool wasRun = false;
+
+    WasRun(Method method) : TestCase(*this, method) {
+    }
+
+    void testMethod() {
+      wasRun = true;
+    }
+  };
+}
+
+TEST(WasRunSpec, make_sure_test_method_was_ran) {
+  WasRun test(&WasRun::testMethod);
+
+  ASSERT_FALSE(test.wasRun);
+  test.run();
+  ASSERT_TRUE(test.wasRun);
+}
+\end{minicpp}
+\end{diff}
+
+
+\begin{nodiff}
+\begin{c++}
+#include <gtest/gtest.h>
+#include <mars/core/TestCase.h>
+
+namespace {
+  struct WasSetUp : TestCase<WasSetUp> {
+    WasSetUp(Method method) : TestCase(*this, method) {
+    }
+
+    void setUp() {
+      wasSetUp = true;
+    }
+
+    void testMethod() {
+    }
+
+    bool wasSetUp = false;
+  };
+}
+
+TEST(WasSetUpSpec, setup_was_invoked_before_test_method_ran) {
+  WasSetUp test(&WasSetUp::testMethod);
+
+  ASSERT_FALSE(test.wasSetUp);
+  test.run();
+  ASSERT_TRUE(test.wasSetUp);
+}
+\end{c++}
+\end{nodiff}
+
+
+\begin{diff}{include/mars/core/TestCase.h}
+\begin{minicpp}
+template <typename Self>
+struct TestCase {
+protected:
+  using Method = void(Self::*)();
+
+public:
+  TestCase(Self& self, Method method)
+    : self(self), method(method) {}
+
+  virtual ~TestCase() {}
+
+  void run() {
+    (self.*method)();
+  }
+
+private:
+  Self& self;
+  Method method;
+};
+\end{minicpp}
+\tcblower
+\begin{minicpp}
+template <typename Self>
+struct TestCase {
+protected:
+  using Method = void(Self::*)();
+
+public:
+  TestCase(Self& self, Method method)
+    : self(self), method(method) {}
+
+  virtual ~TestCase() {}
+
+  void run() {
+    setUp();
+    (self.*method)();
+  }
+
+private:
+  virtual void setUp() {}
+
+private:
+  Self& self;
+  Method method;
+};
+\end{minicpp}
+\end{diff}
+
+
+\begin{diff}{include/mars/core/TestCase.h}
+\begin{minicpp}
+#include <gtest/gtest.h>
+#include <mars/core/TestCase.h>
+
+namespace {
+  struct WasSetUp : TestCase<WasSetUp> {
+    WasSetUp(Method method) : TestCase(*this, method) {
+    }
+
+    void setUp() {
+      wasSetUp = true;
+    }
+
+    void testMethod() {
+    }
+
+    bool wasSetUp = false;
+  };
+}
+
+TEST(WasSetUpSpec, setup_was_invoked_before_test_method_ran) {
+  WasSetUp test(&WasSetUp::testMethod);
+
+  ASSERT_FALSE(test.wasSetUp);
+  test.run();
+  ASSERT_TRUE(test.wasSetUp);
+}
+\end{minicpp}
+\tcblower
+\begin{minicpp}
+#include <gtest/gtest.h>
+#include <mars/core/TestCase.h>
+
+namespace {
+  struct WasSetUp : TestCase<WasSetUp> {
+    WasSetUp(Method method) : TestCase(*this, method) {
+    }
+
+    void testMethod() {
+    }
+
+    bool wasSetUp = false;
+
+  private:
+    void setUp() override {
+      wasSetUp = true;
+    }
+  };
+}
+
+TEST(WasSetUpSpec, setup_was_invoked_before_test_method_ran) {
+  WasSetUp test(&WasSetUp::testMethod);
+
+  ASSERT_FALSE(test.wasSetUp);
+  test.run();
+  ASSERT_TRUE(test.wasSetUp);
+}
+\end{minicpp}
+\end{diff}
