@@ -1,42 +1,57 @@
 
+\begin{savequote}[45mm]
+\ascii{Any fool can write code that a computer can understand. Good programmers write code that humans can understand.}
+\qauthor{\ascii{- Martin Flower}}
+\end{savequote}
+
+\chapter{破冰之旅} 
+\label{ch:xunit-architecture}
+
+\begin{content}
+
+\end{content}
+
+\section{起航}
+
+\begin{content}
+
 第一个测试用例。
 
-\begin{nodiff}{test/mars/core/WasRun.cc}
+\begin{nodiff}{test/mars/core/WasRunSpec.cc}
 \begin{c++}
+#include <mars/core/TestMethod.h>
 #include <gtest/gtest.h>
-#include <mars/core/TestCaller.h>
 
 namespace {
-  struct WasRun {
-    bool wasRun = false;
+  bool wasRun = false;
 
+  struct WasRun {
     void testMethod() {
       wasRun = true;
     }
   };
 }
 
-TEST(TestCaseSpec, make_sure_test_method_was_ran) {
-  WasRun test;
-  ASSERT_FALSE(test.wasRun);
+TEST(WasRunSpec, make_sure_test_method_was_ran) {
+  TestMethod<WasRun> test(&WasRun::testMethod);
 
-  TestCaller<WasRun> caller(test, &WasRun::testMethod);
-  caller.run();
-  ASSERT_TRUE(test.wasRun);
+  ASSERT_FALSE(wasRun);
+  test.run();
+  ASSERT_TRUE(wasRun);
 }
 \end{c++}
 \end{nodiff}
 
-快速通过测试用例。
+快速通过编译。
 
-\begin{nodiff}{include/mars/core/TestCaller.h}
+\begin{nodiff}{include/mars/core/TestMethod.h}
 \begin{c++}
 #ifndef HD3E38C9A_3B03_48CE_9A1B_75B41CB012C6
 #define HD3E38C9A_3B03_48CE_9A1B_75B41CB012C6
 
 template <typename Fixture>
-struct TestCaller {
-  TestCaller(Fixture& self, void(Fixture::*method)());
+struct TestMethod {
+  TestMethod(void(Fixture::*method)());
   void run();
 };
 
@@ -44,111 +59,110 @@ struct TestCaller {
 \end{c++}
 \end{nodiff}
 
-通过连接。
+快速通过连接，并快速实现。
 
-\begin{diff}{test/mars/core/WasRun.cc}
+\begin{diff}{include/mars/core/TestMethod.h}
 \begin{minicpp}
 template <typename Fixture>
-struct TestCaller {
-  TestCaller(Fixture& self, void(Fixture::*method)());
+struct TestMethod {
+  TestMethod(void(Fixture::*method)());
   void run();
 };
 \end{minicpp}
 \tcblower
 \begin{minicpp}
 template <typename Fixture>
-struct TestCaller {
-  TestCaller(Fixture& self, void(Fixture::*method)());
-    : self(&self), method(method) {}
+struct TestMethod {
+  TestMethod(void(Fixture::*method)())
+    : method(method) {}
 
   void run() {
-    (self->*method)();
+    (self.*method)();
   }
 
 private:
-  Fixture* self;
+  Fixture self;
   void(Fixture::*method)();
 };
 \end{minicpp}
 \end{diff}
 
-引入类型别名。
+引入类型别名，消除重复，提升表达力。
 
-\begin{diff}{test/mars/core/WasRun.cc}
+\begin{diff}{include/mars/core/TestMethod.h}
 \begin{minicpp}
 template <typename Fixture>
-struct TestCaller {
-  TestCaller(Fixture& self, void(Fixture::*method)());
-    : self(&self), method(method) {}
+struct TestMethod {
+  TestMethod(void(Fixture::*method)())
+    : method(method) {}
 
   void run() {
-    (self->*method)();
+    (self.*method)();
   }
 
 private:
-  Fixture* self;
+  Fixture self;
   void(Fixture::*method)();
 };
 \end{minicpp}
 \tcblower
 \begin{minicpp}
 template <typename Fixture>
-struct TestCaller {
+struct TestMethod {
 private:
   using Method = void(Fixture::*)();
 
 public:
-  TestCaller(Fixture& self, Method method)
-    : self(&self), method(method) {}
+  TestMethod(Method method)
+    : method(method) {
+  }
 
   void run() {
-    (self->*method)();
+    (self.*method)();
   }
 
 private:
-  Fixture* self;
+  Fixture self;
   Method method;
 };
 \end{minicpp}
 \end{diff}
 
-执行测试方法之前，需要执行setUp。
+执行测试方法之前，需要执行\ascii{setUp}。新建一个失败的测试用例，模拟此场景。
 
-
-\begin{diff}{include/mars/core/TestCase.h}
+\begin{diff}{test/mars/core/WasRunSpec.cc}
 \begin{minicpp}
+#include <mars/core/TestMethod.h>
 #include <gtest/gtest.h>
-#include <mars/core/TestCaller.h>
 
 namespace {
-  struct WasRun {
-    bool wasRun = false;
+  bool wasRun = false;
 
+  struct WasRun {
     void testMethod() {
       wasRun = true;
     }
   };
 }
 
-TEST(TestCaseSpec, make_sure_test_method_was_ran) {
-  WasRun test;
-  ASSERT_FALSE(test.wasRun);
+TEST(WasRunSpec, make_sure_test_method_was_ran) {
+  TestMethod<WasRun> test(&WasRun::testMethod);
 
-  TestCaller<WasRun> caller(test, &WasRun::testMethod);
-  caller.run();
-  ASSERT_TRUE(test.wasRun);
+  ASSERT_FALSE(wasRun);
+  test.run();
+  ASSERT_TRUE(wasRun);
 }
 \end{minicpp}
 \tcblower
 \begin{minicpp}
+#include <mars/core/TestMethod.h>
 #include <gtest/gtest.h>
-#include <mars/core/TestCaller.h>
 
 namespace {
-  struct WasRun {
-    bool wasSetUp = false;
-    bool wasRun = false;
+  bool wasRun = false;
+  bool wasSetUp = false;
 
+  struct WasRun {
     void setUp() {
       wasSetUp = true;
     }
@@ -159,83 +173,81 @@ namespace {
   };
 }
 
-TEST(TestCaseSpec, make_sure_test_method_was_ran) {
-  WasRun test;
-  ASSERT_FALSE(test.wasRun);
+TEST(WasRunSpec, make_sure_test_method_was_ran) {
+  TestMethod<WasRun> test(&WasRun::testMethod);
 
-  TestCaller<WasRun> caller(test, &WasRun::testMethod);
-  caller.run();
-  ASSERT_TRUE(test.wasRun);
+  ASSERT_FALSE(wasRun);
+  test.run();
+  ASSERT_TRUE(wasRun);
 }
 
-TEST(TestCaseSpec, should_setup_before_test_running) {
-  WasRun test;
-  ASSERT_FALSE(test.wasSetUp);
+TEST(WasRunSpec, make_sure_setup_was_ran) {
+  TestMethod<WasRun> test(&WasRun::testMethod);
 
-  TestCaller<WasRun> caller(test, &WasRun::testMethod);
-  caller.run();
-  ASSERT_TRUE(test.wasSetUp);
+  ASSERT_FALSE(wasSetUp);
+  test.run();
+  ASSERT_TRUE(wasSetUp);
 }
 \end{minicpp}
 \end{diff}
 
 先通过测试。
 
-\begin{diff}{include/mars/core/TestCase.h}
+\begin{diff}{include/mars/core/TestMethod.h}
 \begin{minicpp}
 template <typename Fixture>
-struct TestCaller {
+struct TestMethod {
 private:
   using Method = void(Fixture::*)();
 
 public:
-  TestCaller(Fixture& self, Method method)
-    : self(&self), method(method) {}
+  TestMethod(Method method)
+    : method(method) {}
 
   void run() {
-    (self->*method)();
+    (self.*method)();
   }
 
 private:
-  Fixture* self;
+  Fixture self;
   Method method;
 };
 \end{minicpp}
 \tcblower
 \begin{minicpp}
 template <typename Fixture>
-struct TestCaller {
+struct TestMethod {
 private:
   using Method = void(Fixture::*)();
 
 public:
-  TestCaller(Fixture& self, Method method)
-    : self(&self), method(method) {}
+  TestMethod(Method method)
+    : method(method) {}
 
   void run() {
-    self->setUp();
-    (self->*method)();
+    self.setUp();
+    (self.*method)();
   }
 
 private:
-  Fixture* self;
+  Fixture self;
   Method method;
 };
 \end{minicpp}
 \end{diff}
 
-重构测试用例，消除重复。提取公共的测试装置。
+测试执行失败。简单分析，是因为测试之间产生了依赖。此时引入测试装置，在\ascii{SetUp}中重置\ascii{wasSetUp, wasRun}。
 
-\begin{diff}{include/mars/core/TestCase.h}
+\begin{diff}{test/mars/core/WasRunSpec.cc}
 \begin{minicpp}
+#include <mars/core/TestMethod.h>
 #include <gtest/gtest.h>
-#include <mars/core/TestCaller.h>
 
 namespace {
-  struct WasRun {
-    bool wasSetUp = false;
-    bool wasRun = false;
+  bool wasRun = false;
+  bool wasSetUp = true;
 
+  struct WasRun {
     void setUp() {
       wasSetUp = true;
     }
@@ -246,34 +258,32 @@ namespace {
   };
 }
 
-TEST(TestCaseSpec, make_sure_test_method_was_ran) {
-  WasRun test;
-  ASSERT_FALSE(test.wasRun);
+TEST(WasRunSpec, make_sure_test_method_was_ran) {
+  TestMethod<WasRun> test(&WasRun::testMethod);
 
-  TestCaller<WasRun> caller(test, &WasRun::testMethod);
-  caller.run();
-  ASSERT_TRUE(test.wasRun);
+  ASSERT_FALSE(wasRun);
+  test.run();
+  ASSERT_TRUE(wasRun);
 }
 
-TEST(TestCaseSpec, should_setup_before_test_running) {
-  WasRun test;
-  ASSERT_FALSE(test.wasSetUp);
+TEST(WasRunSpec, make_sure_setup_was_ran) {
+  TestMethod<WasRun> test(&WasRun::testMethod);
 
-  TestCaller<WasRun> caller(test, &WasRun::testMethod);
-  caller.run();
-  ASSERT_TRUE(test.wasSetUp);
+  ASSERT_FALSE(wasSetUp);
+  test.run();
+  ASSERT_TRUE(wasSetUp);
 }
 \end{minicpp}
 \tcblower
 \begin{minicpp}
+#include <mars/core/TestMethod.h>
 #include <gtest/gtest.h>
-#include <mars/core/TestCaller.h>
 
 namespace {
-  struct WasRun {
-    bool wasSetUp = false;
-    bool wasRun = false;
+  bool wasRun;
+  bool wasSetUp;
 
+  struct WasRun {
     void setUp() {
       wasSetUp = true;
     }
@@ -283,49 +293,45 @@ namespace {
     }
   };
 
-  struct TestCaseSpec : testing::Test {
-    TestCaseSpec()
-      : caller(test, &WasRun::testMethod) {
+  struct WasRunSpec : testing::Test {
+  private:
+    void SetUp() override {
+      wasRun = false;
+      wasSetUp = false;
     }
-
-  protected:
-    WasRun test;
-    TestCaller<WasRun> caller;
   };
 }
 
-TEST(TestCaseSpec, make_sure_test_method_was_ran) {
-  WasRun test;
-  ASSERT_FALSE(test.wasRun);
+TEST_F(WasRunSpec, make_sure_test_method_was_ran) {
+  TestMethod<WasRun> test(&WasRun::testMethod);
 
-  TestCaller<WasRun> caller(test, &WasRun::testMethod);
-  caller.run();
-  ASSERT_TRUE(test.wasRun);
+  ASSERT_FALSE(wasRun);
+  test.run();
+  ASSERT_TRUE(wasRun);
 }
 
-TEST(TestCaseSpec, should_setup_before_test_running) {
-  WasRun test;
-  ASSERT_FALSE(test.wasSetUp);
+TEST_F(WasRunSpec, make_sure_setup_was_ran) {
+  TestMethod<WasRun> test(&WasRun::testMethod);
 
-  TestCaller<WasRun> caller(test, &WasRun::testMethod);
-  caller.run();
-  ASSERT_TRUE(test.wasSetUp);
+  ASSERT_FALSE(wasSetUp);
+  test.run();
+  ASSERT_TRUE(wasSetUp);
 }
 \end{minicpp}
 \end{diff}
 
-重构第一个测试用例。
+重构测试用例，消除重复。
 
-\begin{diff}{include/mars/core/TestCase.h}
+\begin{diff}{test/mars/core/WasRunSpec.cc}
 \begin{minicpp}
+#include <mars/core/TestMethod.h>
 #include <gtest/gtest.h>
-#include <mars/core/TestCaller.h>
 
 namespace {
-  struct WasRun {
-    bool wasSetUp = false;
-    bool wasRun = false;
+  bool wasRun;
+  bool wasSetUp;
 
+  struct WasRun {
     void setUp() {
       wasSetUp = true;
     }
@@ -334,36 +340,42 @@ namespace {
       wasRun = true;
     }
   };
+
+  struct WasRunSpec : testing::Test {
+  private:
+    void SetUp() override {
+      wasRun = false;
+      wasSetUp = false;
+    }
+  };
 }
 
-TEST(TestCaseSpec, make_sure_test_method_was_ran) {
-  WasRun test;
-  ASSERT_FALSE(test.wasRun);
+TEST_F(WasRunSpec, make_sure_test_method_was_ran) {
+  TestMethod<WasRun> test(&WasRun::testMethod);
 
-  TestCaller<WasRun> caller(test, &WasRun::testMethod);
-  caller.run();
-  ASSERT_TRUE(test.wasRun);
+  ASSERT_FALSE(wasRun);
+  test.run();
+  ASSERT_TRUE(wasRun);
 }
 
-TEST(TestCaseSpec, should_setup_before_test_running) {
-  WasRun test;
-  ASSERT_FALSE(test.wasSetUp);
+TEST_F(WasRunSpec, make_sure_setup_was_ran) {
+  TestMethod<WasRun> test(&WasRun::testMethod);
 
-  TestCaller<WasRun> caller(test, &WasRun::testMethod);
-  caller.run();
-  ASSERT_TRUE(test.wasSetUp);
+  ASSERT_FALSE(wasSetUp);
+  test.run();
+  ASSERT_TRUE(wasSetUp);
 }
 \end{minicpp}
 \tcblower
 \begin{minicpp}
+#include <mars/core/TestMethod.h>
 #include <gtest/gtest.h>
-#include <mars/core/TestCaller.h>
 
 namespace {
-  struct WasRun {
-    bool wasSetUp = false;
-    bool wasRun = false;
+  bool wasRun;
+  bool wasSetUp;
 
+  struct WasRun {
     void setUp() {
       wasSetUp = true;
     }
@@ -373,232 +385,47 @@ namespace {
     }
   };
 
-  struct TestCaseSpec : testing::Test {
-    TestCaseSpec()
-      : caller(test, &WasRun::testMethod) {
+  struct WasRunSpec : testing::Test {
+  private:
+    void SetUp() override {
+      wasRun = false;
+      wasSetUp = false;
     }
 
   protected:
-    WasRun test;
-    TestCaller<WasRun> caller;
+    void makeSure(bool invoked) {
+      ASSERT_FALSE(invoked);
+      test.run();
+      ASSERT_TRUE(invoked);      
+    }
+
+  private:
+    TestMethod<WasRun> test = &WasRun::testMethod;
   };
 }
 
-TEST_F(TestCaseSpec, make_sure_test_method_was_ran) {
-  ASSERT_FALSE(test.wasRun);
-  caller.run();
-  ASSERT_TRUE(test.wasRun);
+TEST_F(WasRunSpec, make_sure_test_method_was_ran) {
+  makeSure(wasRun);
 }
 
-TEST(TestCaseSpec, should_setup_before_test_running) {
-  WasRun test;
-  ASSERT_FALSE(test.wasSetUp);
-
-  TestCaller<WasRun> caller(test, &WasRun::testMethod);
-  caller.run();
-  ASSERT_TRUE(test.wasSetUp);
-}
-\end{minicpp}
-\end{diff}
-
-测试失败了，\ascii{Google Test}真心失败。
-
-\begin{diff}{include/mars/core/TestCase.h}
-\begin{minicpp}
-#include <gtest/gtest.h>
-#include <mars/core/TestCaller.h>
-
-namespace {
-  struct WasRun {
-    bool wasSetUp = false;
-    bool wasRun = false;
-
-    void setUp() {
-      wasSetUp = true;
-    }
-
-    void testMethod() {
-      wasRun = true;
-    }
-  };
-
-  struct TestCaseSpec : testing::Test {
-    TestCaseSpec()
-      : caller(test, &WasRun::testMethod) {
-    }
-
-  protected:
-    WasRun test;
-    TestCaller<WasRun> caller;
-  };
-}
-
-TEST_F(TestCaseSpec, make_sure_test_method_was_ran) {
-  ASSERT_FALSE(test.wasRun);
-  caller.run();
-  ASSERT_TRUE(test.wasRun);
-}
-
-TEST(TestCaseSpec, should_setup_before_test_running) {
-  WasRun test;
-  ASSERT_FALSE(test.wasSetUp);
-
-  TestCaller<WasRun> caller(test, &WasRun::testMethod);
-  caller.run();
-  ASSERT_TRUE(test.wasSetUp);
-}
-\end{minicpp}
-\tcblower
-\begin{minicpp}
-#include <gtest/gtest.h>
-#include <mars/core/TestCaller.h>
-
-namespace {
-  struct WasRun {
-    bool wasSetUp = false;
-    bool wasRun = false;
-
-    void setUp() {
-      wasSetUp = true;
-    }
-
-    void testMethod() {
-      wasRun = true;
-    }
-  };
-
-  struct TestCaseSpec : testing::Test {
-    TestCaseSpec()
-      : caller(test, &WasRun::testMethod) {
-    }
-
-  protected:
-    WasRun test;
-    TestCaller<WasRun> caller;
-  };
-}
-
-TEST_F(TestCaseSpec, make_sure_test_method_was_ran) {
-  ASSERT_FALSE(test.wasRun);
-  caller.run();
-  ASSERT_TRUE(test.wasRun);
-}
-
-TEST(TestCaseSpecX, should_setup_before_test_running) {
-  WasRun test;
-  ASSERT_FALSE(test.wasSetUp);
-
-  TestCaller<WasRun> caller(test, &WasRun::testMethod);
-  caller.run();
-  ASSERT_TRUE(test.wasSetUp);
-}
-\end{minicpp}
-\end{diff}
-
-通过测试。重构第二个测试用例。
-
-\begin{diff}{include/mars/core/TestCase.h}
-\begin{minicpp}
-#include <gtest/gtest.h>
-#include <mars/core/TestCaller.h>
-
-namespace {
-  struct WasRun {
-    bool wasSetUp = false;
-    bool wasRun = false;
-
-    void setUp() {
-      wasSetUp = true;
-    }
-
-    void testMethod() {
-      wasRun = true;
-    }
-  };
-
-  struct TestCaseSpec : testing::Test {
-    TestCaseSpec()
-      : caller(test, &WasRun::testMethod) {
-    }
-
-  protected:
-    WasRun test;
-    TestCaller<WasRun> caller;
-  };
-}
-
-TEST_F(TestCaseSpec, make_sure_test_method_was_ran) {
-  ASSERT_FALSE(test.wasRun);
-  caller.run();
-  ASSERT_TRUE(test.wasRun);
-}
-
-TEST(TestCaseSpecX, should_setup_before_test_running) {
-  WasRun test;
-  ASSERT_FALSE(test.wasSetUp);
-
-  TestCaller<WasRun> caller(test, &WasRun::testMethod);
-  caller.run();
-  ASSERT_TRUE(test.wasSetUp);
-}
-\end{minicpp}
-\tcblower
-\begin{minicpp}
-#include <gtest/gtest.h>
-#include <mars/core/TestCaller.h>
-
-namespace {
-  struct WasRun {
-    bool wasSetUp = false;
-    bool wasRun = false;
-
-    void setUp() {
-      wasSetUp = true;
-    }
-
-    void testMethod() {
-      wasRun = true;
-    }
-  };
-
-  struct TestCaseSpec : testing::Test {
-    TestCaseSpec()
-      : caller(test, &WasRun::testMethod) {
-    }
-
-  protected:
-    WasRun test;
-    TestCaller<WasRun> caller;
-  };
-}
-
-TEST_F(TestCaseSpec, make_sure_test_method_was_ran) {
-  ASSERT_FALSE(test.wasRun);
-  caller.run();
-  ASSERT_TRUE(test.wasRun);
-}
-
-TEST_F(TestCaseSpec, should_setup_before_test_running) {
-  ASSERT_FALSE(test.wasSetUp);
-  caller.run();
-  ASSERT_TRUE(test.wasSetUp);
+TEST_F(WasRunSpec, make_sure_setup_was_ran) {
+  makeSure(wasSetUp);
 }
 \end{minicpp}
 \end{diff}
 
 测试通过，重构完毕。校验调用顺序。
 
-\begin{diff}{include/mars/core/TestCase.h}
+\begin{diff}{test/mars/core/WasRunSpec.cc}
 \begin{minicpp}
-
+#include <mars/core/TestMethod.h>
 #include <gtest/gtest.h>
-#include <mars/core/TestCaller.h>
 
 namespace {
-  struct WasRun {
-    bool wasSetUp = false;
-    bool wasRun = false;
+  bool wasRun;
+  bool wasSetUp;
 
+  struct WasRun {
     void setUp() {
       wasSetUp = true;
     }
@@ -608,142 +435,152 @@ namespace {
     }
   };
 
-  struct TestCaseSpec : testing::Test {
-    TestCaseSpec()
-      : caller(test, &WasRun::testMethod) {
+  struct WasRunSpec : testing::Test {
+  private:
+    void SetUp() override {
+      wasRun = false;
+      wasSetUp = false;
     }
 
   protected:
-    WasRun test;
-    TestCaller<WasRun> caller;
+    void makeSure(bool invoked) {
+      ASSERT_FALSE(invoked);
+      test.run();
+      ASSERT_TRUE(invoked);      
+    }
+
+  private:
+    TestMethod<WasRun> test = &WasRun::testMethod;
   };
 }
 
-TEST_F(TestCaseSpec, make_sure_test_method_was_ran) {
-  ASSERT_FALSE(test.wasRun);
-  caller.run();
-  ASSERT_TRUE(test.wasRun);
+TEST_F(WasRunSpec, make_sure_test_method_was_ran) {
+  makeSure(wasRun);
 }
 
-TEST_F(TestCaseSpec, should_setup_before_test_running) {
-  ASSERT_FALSE(test.wasSetUp);
-  caller.run();
-  ASSERT_TRUE(test.wasSetUp);
+TEST_F(WasRunSpec, make_sure_setup_was_ran) {
+  makeSure(wasSetUp);
 }
 \end{minicpp}
 \tcblower
 \begin{minicpp}
+#include <mars/core/TestMethod.h>
 #include <gtest/gtest.h>
-#include <mars/core/TestCaller.h>
 
 namespace {
-  struct WasRun {
-    bool wasSetUp = false;
-    bool wasRun = false;
-    std::string result;
+  bool wasRun;
+  bool wasSetUp;
+  std::string result;
 
+  struct WasRun {
     void setUp() {
       wasSetUp = true;
-      result += "[setUp]";
     }
 
     void testMethod() {
       wasRun = true;
-      result += "[runTest]";
     }
   };
 
-  struct TestCaseSpec : testing::Test {
-    TestCaseSpec()
-      : caller(test, &WasRun::testMethod) {
+  struct WasRunSpec : testing::Test {
+  private:
+    void SetUp() override {
+      wasRun = false;
+      wasSetUp = false;
+      result.clear();
     }
 
   protected:
-    WasRun test;
-    TestCaller<WasRun> caller;
+    void makeSure(bool invoked) {
+      ASSERT_FALSE(invoked);
+      test.run();
+      ASSERT_TRUE(invoked);      
+    }
+
+  protected:
+    TestMethod<WasRun> test = &WasRun::testMethod;
   };
 }
 
-TEST_F(TestCaseSpec, make_sure_test_method_was_ran) {
-  ASSERT_FALSE(test.wasRun);
-  caller.run();
-  ASSERT_TRUE(test.wasRun);
+TEST_F(WasRunSpec, make_sure_test_method_was_ran) {
+  makeSure(wasRun);
 }
 
-TEST_F(TestCaseSpec, make_sure_test_setup_was_ran) {
-  ASSERT_FALSE(test.wasSetUp);
-  caller.run();
-  ASSERT_TRUE(test.wasSetUp);
+TEST_F(WasRunSpec, make_sure_setup_was_ran) {
+  makeSure(wasSetUp);
 }
 
-TEST_F(TestCaseSpec, should_setup_before_test_running) {
-  caller.run();
-  ASSERT_EQ("[setUp][runTest]", test.result);
+TEST_F(WasRunSpec, should_setup_before_running_test) {
+  test.run();
+  ASSERT_EQ("[setUp][runTest]", result);
 }
 \end{minicpp}
 \end{diff}
 
 消除重复。
 
-\begin{diff}{include/mars/core/TestCase.h}
+\begin{diff}{test/mars/core/WasRunSpec.cc}
 \begin{minicpp}
+#include <mars/core/TestMethod.h>
 #include <gtest/gtest.h>
-#include <mars/core/TestCaller.h>
 
 namespace {
-  struct WasRun {
-    bool wasSetUp = false;
-    bool wasRun = false;
-    std::string result;
+  bool wasRun;
+  bool wasSetUp;
+  std::string result;
 
+  struct WasRun {
     void setUp() {
       wasSetUp = true;
-      result += "[setUp]";
     }
 
     void testMethod() {
       wasRun = true;
-      result += "[runTest]";
     }
   };
 
-  struct TestCaseSpec : testing::Test {
-    TestCaseSpec()
-      : caller(test, &WasRun::testMethod) {
+  struct WasRunSpec : testing::Test {
+  private:
+    void SetUp() override {
+      wasRun = false;
+      wasSetUp = false;
+      result.clear();
     }
 
   protected:
-    WasRun test;
-    TestCaller<WasRun> caller;
+    void makeSure(bool invoked) {
+      ASSERT_FALSE(invoked);
+      test.run();
+      ASSERT_TRUE(invoked);      
+    }
+
+  protected:
+    TestMethod<WasRun> test = &WasRun::testMethod;
   };
 }
 
-TEST_F(TestCaseSpec, make_sure_test_method_was_ran) {
-  ASSERT_FALSE(test.wasRun);
-  caller.run();
-  ASSERT_TRUE(test.wasRun);
+TEST_F(WasRunSpec, make_sure_test_method_was_ran) {
+  makeSure(wasRun);
 }
 
-TEST_F(TestCaseSpec, make_sure_test_setup_was_ran) {
-  ASSERT_FALSE(test.wasSetUp);
-  caller.run();
-  ASSERT_TRUE(test.wasSetUp);
+TEST_F(WasRunSpec, make_sure_setup_was_ran) {
+  makeSure(wasSetUp);
 }
 
-TEST_F(TestCaseSpec, should_setup_before_test_running) {
-  caller.run();
-  ASSERT_EQ("[setUp][runTest]", test.result);
+TEST_F(WasRunSpec, should_setup_before_running_test) {
+  test.run();
+  ASSERT_EQ("[setUp][runTest]", result);
 }
 \end{minicpp}
 \tcblower
 \begin{minicpp}
 #include <gtest/gtest.h>
-#include <mars/core/TestCaller.h>
+#include <mars/core/TestMethod.h>
 
 namespace {
-  struct WasRun {
-    std::string result;
+  std::string result;
 
+  struct WasRun {
     void setUp() {
       result += "[setUp]";
     }
@@ -754,28 +591,25 @@ namespace {
   };
 }
 
-TEST(TestCaseSpec, make_sure_test_case_can_run_normally) {
-  WasRun test;
-  TestCaller<WasRun> caller(test, &WasRun::testMethod);
-
-  caller.run();
-  ASSERT_EQ("[setUp][runTest]", test.result);
+TEST(WasRunSpec, should_setup_before_running_test) {
+  TestMethod<WasRun> test(&WasRun::testMethod);
+  test.run();
+  ASSERT_EQ("[setUp][runTest]", result);
 }
 \end{minicpp}
 \end{diff}
 
-
 测试执行完之后，调用\ascii{tearDown}释放资源。
 
-\begin{diff}{include/mars/core/TestCase.h}
+\begin{diff}{test/mars/core/WasRunSpec.cc}
 \begin{minicpp}
+#include <mars/core/TestMethod.h>
 #include <gtest/gtest.h>
-#include <mars/core/TestCaller.h>
 
 namespace {
-  struct WasRun {
-    std::string result;
+  std::string result;
 
+  struct WasRun {
     void setUp() {
       result += "[setUp]";
     }
@@ -786,23 +620,21 @@ namespace {
   };
 }
 
-TEST(TestCaseSpec, should_setup_before_test_running) {
-  WasRun test;
-  TestCaller<WasRun> caller(test, &WasRun::testMethod);
-
-  caller.run();
-  ASSERT_EQ("[setUp][runTest]", test.result);
+TEST(WasRunSpec, should_setup_before_running_test) {
+  TestMethod<WasRun> test(&WasRun::testMethod);
+  test.run();
+  ASSERT_EQ("[setUp][runTest]", result);
 }
 \end{minicpp}
 \tcblower
 \begin{minicpp}
+#include <mars/core/TestMethod.h>
 #include <gtest/gtest.h>
-#include <mars/core/TestCaller.h>
 
 namespace {
-  struct WasRun {
-    std::string result;
+  std::string result;
 
+  struct WasRun {
     void setUp() {
       result += "[setUp]";
     }
@@ -817,115 +649,213 @@ namespace {
   };
 }
 
-TEST(TestCaseSpec, full_life_cycle_for_test_case) {
-  WasRun test;
-  TestCaller<WasRun> caller(test, &WasRun::testMethod);
-
-  caller.run();
-  ASSERT_EQ("[setUp][runTest][tearDown]", test.result);
+TEST(WasRunSpec, full_life_cycle_for_test_case) {
+  TestMethod<WasRun> test(&WasRun::testMethod);
+  test.run();
+  ASSERT_EQ("[setUp][runTest][tearDown]", result);
 }
+\end{minicpp}
+\end{diff}
+
+为了快速通过测试。
+
+\begin{diff}{include/mars/core/TestMethod.h}
+\begin{minicpp}
+template <typename Fixture>
+struct TestMethod {
+private:
+  using Method = void(Fixture::*)();
+
+public:
+  TestMethod(Method method)
+    : method(method) {}
+
+  void run() {
+    self.setUp();
+    (self.*method)();
+  }
+
+private:
+  Fixture self;
+  Method method;
+};
+\end{minicpp}
+\tcblower
+\begin{minicpp}
+template <typename Fixture>
+struct TestMethod {
+private:
+  using Method = void(Fixture::*)();
+
+public:
+  TestMethod(Method method)
+    : method(method) {}
+
+  void run() {
+    self.setUp();
+    (self.*method)();
+    self.tearDown();
+  }
+
+private:
+  Fixture self;
+  Method method;
+};
 \end{minicpp}
 \end{diff}
 
 存在一个陷阱，模拟失败的测试用例。
 
-\begin{nodiff}{include/mars/core/TestCase.h}
+\begin{nodiff}{test/mars/core/WasSuccSpec.cc}
 \begin{c++}
-namespace {
-  struct WasSucc {
-    bool wasSucc = false;
+#include <mars/core/TestMethod.h>
+#include <gtest/gtest.h>
 
+namespace {
+  bool wasSucc = false;
+
+  struct WasSucc {
     void testMethod() {
       wasSucc = true;
     }
   };
 }
 
-TEST(TestCaseSpec, make_sure_test_running_is_succ) {
-  WasSucc test;
-  TestCaller<WasSucc> caller(test, &WasSucc::testMethod);
-
-  ASSERT_FALSE(test.wasSucc);
-  caller.run();
-  ASSERT_TRUE(test.wasSucc);
+TEST(WasSuccSpec, make_sure_test_running_be_succ) {
+  TestMethod<WasSucc> test(&WasSucc::testMethod);
+  test.run();
+  ASSERT_TRUE(wasSucc);
 }
 \end{c++}
 \end{nodiff}
 
-此时编译失败。为了快速通过测试，引入\ascii{TestFixture}。
+此时编译失败。为了快速通过测试。
 
-\begin{nodiff}{include/mars/core/TestCase.h}
+\begin{diff}{test/mars/core/WasSuccSpec.cc}
+\begin{minicpp}
+#include <gtest/gtest.h>
+#include <mars/core/TestMethod.h>
+
+namespace {
+  bool wasSucc = false;
+
+  struct WasSucc {
+    void testMethod() {
+      wasSucc = true;
+    }
+  };
+}
+
+TEST(WasSuccSpec, make_sure_test_running_is_succ) {
+  TestMethod<WasSucc> test(&WasSucc::testMethod);
+  test.run();
+  ASSERT_TRUE(wasSucc);
+}
+\end{minicpp}
+\tcblower
+\begin{minicpp}
+#include <mars/core/TestMethod.h>
+#include <gtest/gtest.h>
+
+namespace {
+  bool wasSucc = false;
+
+  struct WasSucc {
+    void setUp() {
+    }
+
+    void testMethod() {
+      wasSucc = true;
+    }
+
+    void tearDown() {
+    }
+  };
+}
+
+TEST(WasSuccSpec, make_sure_test_running_be_succ) {
+  TestMethod<WasSucc> test(&WasSucc::testMethod);
+  test.run();
+  ASSERT_TRUE(wasSucc);
+}
+\end{minicpp}
+\end{diff}
+
+提取公共抽象\ascii{TestFixture}。
+
+\begin{nodiff}{include/mars/core/TestFixture.h}
 \begin{c++}
 struct TestFixture {
   virtual void setUp() {}
   virtual void tearDown() {}
+  
   virtual ~TestFixture() {}
 };
 \end{c++}
 \end{nodiff}
 
-通过测试。
-
-\begin{diff}{include/mars/core/TestCase.h}
+\begin{diff}{test/mars/core/WasSuccSpec.cc}
 \begin{minicpp}
-#include <mars/core/TestCaller.h>
+#include <mars/core/TestMethod.h>
 #include <gtest/gtest.h>
 
 namespace {
+  bool wasSucc = false;
+
   struct WasSucc {
-    bool wasSucc = false;
+    void setUp() {
+    }
 
     void testMethod() {
       wasSucc = true;
     }
+
+    void tearDown() {
+    }
   };
 }
 
-TEST(TestCaseSpec, make_sure_test_running_is_succ) {
-  WasSucc test;
-  TestCaller<WasSucc> caller(test, &WasSucc::testMethod);
-
-  ASSERT_FALSE(test.wasSucc);
-  caller.run();
-  ASSERT_TRUE(test.wasSucc);
+TEST(WasSuccSpec, make_sure_test_running_is_succ) {
+  TestMethod<WasSucc> test(&WasSucc::testMethod);
+  test.run();
+  ASSERT_TRUE(wasSucc);
 }
 \end{minicpp}
 \tcblower
 \begin{minicpp}
-#include <mars/core/TestCaller.h>
+#include <mars/core/TestMethod.h>
 #include <mars/core/TestFixture.h>
 #include <gtest/gtest.h>
 
 namespace {
-  struct WasSucc : TestFixture {
-    bool wasSucc = false;
+  bool wasSucc = false;
 
+  struct WasSucc : TestFixture {
     void testMethod() {
       wasSucc = true;
     }
   };
 }
 
-TEST(TestCaseSpec, make_sure_test_running_is_succ) {
-  WasSucc test;
-  TestCaller<WasSucc> caller(test, &WasSucc::testMethod);
-
-  ASSERT_FALSE(test.wasSucc);
-  caller.run();
-  ASSERT_TRUE(test.wasSucc);
+TEST(WasSuccSpec, make_sure_test_running_is_succ) {
+  TestMethod<WasSucc> test(&WasSucc::testMethod);
+  test.run();
+  ASSERT_TRUE(wasSucc);
 }
 \end{minicpp}
 \end{diff}
 
-\begin{diff}{include/mars/core/TestCase.h}
+同理，测试用例\ascii{WasRun}也注入\ascii{TestFixture}。
+
+\begin{diff}{test/mars/core/WasRunSpec.cc}
 \begin{minicpp}
-#include <mars/core/TestCaller.h>
+#include <mars/core/TestMethod.h>
 #include <gtest/gtest.h>
 
 namespace {
-  struct WasRun {
-    std::string result;
+  std::string result;
 
+  struct WasRun {
     void setUp() {
       result += "[setUp]";
     }
@@ -940,24 +870,22 @@ namespace {
   };
 }
 
-TEST(TestCaseSpec, make_sure_test_case_can_run_normally) {
-  WasRun test;
-  TestCaller<WasRun> caller(test, &WasRun::testMethod);
-
-  caller.run();
-  ASSERT_EQ("[setUp][runTest][tearDown]", test.result);
+TEST(WasRunSpec, full_life_cycle_for_test_case) {
+  TestMethod<WasRun> test(&WasRun::testMethod);
+  test.run();
+  ASSERT_EQ("[setUp][runTest][tearDown]", result);
 }
 \end{minicpp}
 \tcblower
 \begin{minicpp}
-#include <mars/core/TestCaller.h>
+#include <mars/core/TestMethod.h>
 #include <mars/core/TestFixture.h>
 #include <gtest/gtest.h>
 
 namespace {
-  struct WasRun : TestFixture {
-    std::string result;
+  std::string result;
 
+  struct WasRun : TestFixture {
     void setUp() override {
       result += "[setUp]";
     }
@@ -972,12 +900,91 @@ namespace {
   };
 }
 
-TEST(TestCaseSpec, make_sure_test_case_can_run_normally) {
-  WasRun test;
-  TestCaller<WasRun> caller(test, &WasRun::testMethod);
-
-  caller.run();
-  ASSERT_EQ("[setUp][runTest][tearDown]", test.result);
+TEST(WasRunSpec, full_life_cycle_for_test_case) {
+  TestMethod<WasRun> test(&WasRun::testMethod);
+  test.run();
+  ASSERT_EQ("[setUp][runTest][tearDown]", result);
 }
 \end{minicpp}
 \end{diff}
+
+提取抽象\ascii{TestCase}。
+
+\begin{diff}{include/mars/core/TestCase.h, src/mars/core/TestCase.cc}
+\begin{minicpp}
+#include <mars/core/TestFixture.h>
+
+struct TestCase : private TestFixture {
+  void run();
+
+private:
+  virtual void runTest() {}
+};
+\end{minicpp}
+\tcblower
+\begin{minicpp}
+#include <mars/core/TestCase.h>
+
+void TestCase::run() {
+  setUp();
+  runTest();
+  tearDown();
+}
+\end{minicpp}
+\end{diff}
+
+\begin{diff}{include/mars/core/TestMethod.h}
+\begin{minicpp}
+template <typename Fixture>
+struct TestMethod {
+private:
+  using Method = void(Fixture::*)();
+
+public:
+  TestMethod(Method method)
+    : method(method) {}
+
+  void run() {
+    self.setUp();
+    (self.*method)();
+    self.tearDown();
+  }
+
+private:
+  Fixture self;
+  Method method;
+};
+\end{minicpp}
+\tcblower
+\begin{minicpp}
+#include <mars/core/TestCase.h>
+
+template <typename Fixture>
+struct TestMethod : TestCase {
+private:
+  using Method = void(Fixture::*)();
+
+public:
+  TestMethod(Method method)
+    : method(method) {}
+
+private:
+  void setUp() override {
+    self.setUp();
+  }
+
+  void runTest() override {
+    (self.*method)();
+  }
+  void tearDown() override {
+    self.tearDown();
+  }
+
+private:
+  Fixture self;
+  Method method;
+};
+\end{minicpp}
+\end{diff}
+
+\begin{content}

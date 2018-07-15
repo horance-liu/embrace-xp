@@ -31,9 +31,9 @@
 
 \subsection{项目组织}
 
-\ascii{xUnit Mars}项目目录结构如\refig{mars-project}所示。
+项目\ascii{xUnit Mars}物理目录如\refig{mars-project}所示。
 
-\begin{figure}[H]
+\begin{figure}
 \centering
 \includegraphics[width=0.6\textwidth]{figures/xunit/mars-project.png}
 \caption{xUnit Mars: 项目组织}
@@ -57,16 +57,16 @@
 
 本书使用\ascii{K\&R}的代码风格，但在对齐方面做了细微调整，如\refig{eclipse-formatter}所示。配置完毕之后，便可以充分享受神奇带来的快感。
 
-例如，创建头文件时，自动生成\ascii{UUID}的头文件保护宏，彻底抛弃这个遗留问题；当需要排版代码时，使用快捷键\ascii{Ctrl + Shift + F}立马得到漂亮的代码风格。
-
-关于\ascii{Eclipse CDT}详细配置与使用技巧，推荐阅读王博\footnote{\href{https://www.jianshu.com/u/92b7d9879f20}{\ascii{https://www.jianshu.com/u/92b7d9879f20}}}在简书上的三篇博文：\href{https://www.jianshu.com/p/dafcdce1f9cb}{\ascii{Effective Eclipse CDT}}。
-
 \begin{figure}[H]
 \centering
 \includegraphics[width=1.0\textwidth]{figures/xunit/eclipse-formatter.png}
 \caption{代码风格: K\&R}
  \label{fig:eclipse-formatter}
 \end{figure}
+
+例如，创建头文件时，自动生成\ascii{UUID}的头文件保护宏，彻底抛弃这个遗留问题；当需要排版代码时，使用快捷键\ascii{Ctrl + Shift + F}立马得到漂亮的代码风格。
+
+关于\ascii{Eclipse CDT}详细配置与使用技巧，推荐阅读王博\footnote{\href{https://www.jianshu.com/u/92b7d9879f20}{\ascii{https://www.jianshu.com/u/92b7d9879f20}}}在简书上的三篇博文：\href{https://www.jianshu.com/p/dafcdce1f9cb}{\ascii{Effective Eclipse CDT}}。
 
 \end{content}
 
@@ -124,7 +124,7 @@ $ git init
 \begin{nodiff}{提交代码}
  \begin{c++}
 $ git add -A .
-$ git commit -m"setup project"
+$ git commit -m"setup cmake project"
  \end{c++}
 \end{nodiff}
 
@@ -136,36 +136,86 @@ $ git commit -m"setup project"
 
 \subsection{测试用例}
 
-万事开头难，第一个用例跑起来并不容易。此处设计实现了一个简单的测试用例，用户通过扩展\ascii{xUnit Mars}框架中的\ascii{TestCase}，实现测试用例的增加。
+万事开头难，第一个用例跑起来并不容易。此处模拟设计了一个\ascii{xUnit Mars}风格的测试用例\ascii{WasRun}，它包含了一个\emph{测试方法}：\ascii{WasRun::testMethod}，它是\ascii{WasRun}的一个成员函数。
 
-\begin{nodiff}{test/mars/core/TestCaseSpec.cc}
- \begin{c++}
+\begin{nodiff}{test/mars/core/WasRunSpec.cc}
+\begin{c++}
 #include <gtest/gtest.h>
-#include "mars/core/TestCase.h"
 
 namespace {
-  struct SimpleTest : TestCase {
+  struct WasRun {
     bool wasRun = false;
 
-  private:
-    void run() override {
+    void testMethod() {
       wasRun = true;
     }
   };
-
-  void run(TestCase& test) {
-    test.run();
-  }
 }
 
-TEST(SimpleTest, make_sure_test_case_can_run_normally) {
-  SimpleTest test;
-  run(test);
+TEST(WasRunSpec, make_sure_test_method_be_ran) {
+  WasRun test;
 
+  ASSERT_FALSE(test.wasRun);
+  test.testMethod();
   ASSERT_TRUE(test.wasRun);
 }
- \end{c++}
+\end{c++}
 \end{nodiff}
+
+但是，这个测试很鸡肋，不仅天然地通过，而且不能驱动出任何的产品代码。再仔细思考一下，\ascii{xUnit Mars}的职责就是负责调度和执行\emph{测试方法}的，其应该对外开放执行\emph{测试方法}的\ascii{API}。因为\ascii{testMethod}是\ascii{WasRun}的一个成员函数，要调用该测试方法，必须具备两个条件：
+
+\begin{enum}
+  \eitem{测试对象：\code{WasRun}对象；}
+  \eitem{测试方法：\code{WasRun::testMethod}成员函数，或指向该成员函数的指针。}
+\end{enum}
+
+因此，引入\ascii{xUnit Mars}执行测试方法的\ascii{run}函数，其第一个参数接受\ascii{WasRun}的测试对象，第二个参数接受指向成员函数\ascii{WasRun::testMethod}的指针。相比之前的测试用例，该测试可以驱动出部分实现；虽然进步甚微，但已迈出具有实际意义的第一步。
+
+\begin{diff}{test/mars/core/WasRunSpec.cc}
+\begin{minicpp}
+#include <gtest/gtest.h>
+
+namespace {
+  struct WasRun {
+    bool wasRun = false;
+
+    void testMethod() {
+      wasRun = true;
+    }
+  };
+}
+
+TEST(WasRunSpec, make_sure_test_method_be_ran) {
+  WasRun test;
+
+  ASSERT_FALSE(test.wasRun);
+  test.testMethod();
+  ASSERT_TRUE(test.wasRun);
+}
+\end{minicpp}
+\tcblower
+\begin{minicpp}
+#include <gtest/gtest.h>
+
+namespace {
+  struct WasRun {
+    bool wasRun = false;
+
+    void testMethod() {
+      wasRun = true;
+    }
+  };
+}
+
+TEST(WasRunSpec, make_sure_test_method_be_ran) {
+  WasRun test;
+
+  ASSERT_FALSE(test.wasRun);
+  run(test, &WasRun::testMethod);
+  ASSERT_TRUE(test.wasRun);
+}
+\end{minicpp}
+\end{diff}
 
 \begin{episode}{TDD: 测试驱动开发}
 
@@ -249,22 +299,206 @@ TEST(SimpleTest, make_sure_test_case_can_run_normally) {
 
 \end{episode}
 
-\subsection{通过编译}
+\subsubsection{通过测试}
 
-此处引入了多态技术，当\ascii{TestCase::run}启动运行时，将在运行时调用覆写的\ascii{SimpleTest::run}，实现自定义测试用例的执行。
+不幸的是，\ascii{run}函数依赖于具体类型\ascii{WasRun}，而\ascii{WarRun}存在于匿名命名空间内。我们不期望将\ascii{WasRun}搬迁至产品实现中，毕竟\ascii{WarRun}是一个用户自定义的\ascii{xUnit Mars}风格的测试用例。
 
-\begin{nodiff}{include/mars/core/TestCase.h}
+为了快速通过测试用例，且不破坏匿名命名空间的封装性，姑且就近实现\ascii{run}函数，暂时不搬迁\ascii{run}函数至产品代码之中。
+
+\begin{nodiff}{test/mars/core/WasRunSpec.cc}
+\begin{c++}
+#include <gtest/gtest.h>
+
+namespace {
+  struct WasRun {
+    bool wasRun = false;
+
+    void testMethod() {
+      wasRun = true;
+    }
+  };
+
+  void run(WasRun& self, void(WasRun::*method)()) {
+    (self.*method)();
+  }
+}
+
+TEST(WasRunSpec, make_sure_test_method_be_ran) {
+  WasRun test;
+  ASSERT_FALSE(test.wasRun);
+
+  run(test, &WasRun::testMethod);
+  ASSERT_TRUE(test.wasRun);
+}
+\end{c++}
+\end{nodiff}
+
+\subsubsection{执行测试}
+
+在\ascii{build}临时目录中，使用\ascii{cmake}构建工程。
+
+\begin{nodiff}{构建工程}
  \begin{c++}
-#ifndef H586108AA_CD7B_459D_8A2F_0DFE6C9720ED
-#define H586108AA_CD7B_459D_8A2F_0DFE6C9720ED
+$ mkdir -p build && cd build
+$ cmake ..
+$ make
+ \end{c++}
+\end{nodiff}
 
-struct TestCase {
-  virtual void run() = 0;
-  virtual ~TestCase() {}
-};
+运行测试。
+
+\begin{nodiff}{运行测试}
+ \begin{c++}
+$ test/mars-test
+Running main() from gtest_main.cc
+[==========] Running 1 test from 1 test case.
+[----------] Global test environment set-up.
+[----------] 1 test from SimpleTest
+[ RUN      ] SimpleTest.make_sure_test_case_can_run_normally
+[       OK ] SimpleTest.make_sure_test_case_can_run_normally (0 ms)
+[----------] 1 test from SimpleTest (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test case ran. (0 ms total)
+[  PASSED  ] 1 test.
+ \end{c++}
+\end{nodiff}
+
+\begin{episode}{全局忽略模式}
+
+\begin{content}
+
+\ascii{CMake}在临时目录\ascii{build}中完成系统构建，为了避免不经意地将\ascii{build}目录提交至\ascii{Git}库，常常需要在\ascii{.gitignore}文件中配置相应的忽略模式。
+
+但是，为每个项目都创建一个\ascii{.gitignore}文件，显然是一种重复设计。因此，配置全局忽略模式是一个更恰当的解决方案。
+
+ \begin{c++}
+$ git config --global core.excludesfile ~/.gitignore_global
+$ vi ~/.gitignore_global
+# cmake
+build/
+
+# vi
+*.swp
+
+# eclipse
+.project
+.cproject
+.settings/
+
+# tex
+output/
+ \end{c++}
+
+\end{content}
+\end{episode}
+
+\subsubsection{提交代码}
+
+每当通过测试后，立即提交代码到\ascii{Git}库。
+
+\begin{nodiff}{提交代码}
+ \begin{c++}
+$ git add -A .
+$ git commit -m"pass first test case"
+ \end{c++}
+\end{nodiff}
+
+\begin{episode}{后悔药}
+
+\begin{content}
+
+感谢\ascii{Linus}创造了\ascii{Linux}与\ascii{Git}，让全世界的程序员得以享受编程的快乐。\ascii{TDD}精髓之一便是“小”，配合运用\ascii{Git}，简直就是完美，避免不经意的错误而丢失代码。
+
+养成经常性提交代码至\ascii{Git}库，是一种良好的编程习惯。在\ascii{TDD}的一个迭代循环中，每当编译通过，链接通过，测试通过，关键重构成功，都应立即执行\ascii{git add}。当设计重构至相对合理状态，最后执行\ascii{git commit}入库，完成一次\ascii{TDD}的闭环。
+
+此外，借助于\ascii{Git}，随时可以吃后悔药。当尝试某种重构设计时，没有达到预期效果，则可以轻松回到上一个稳定状态，重新开始尝试新的努力。以“重命名函数”的重构过程为例，讲述\ascii{Git}的操作。
+
+\begin{enum}
+  \eitem{新建一个函数；}
+  \eitem{拷贝旧函数的实现至新函数；}
+  \eitem{确保编译、测试通过，执行\code{git add}；}  
+  \eitem{删除旧函数的实现逻辑，转调新函数；}
+  \eitem{确保编译、测试通过，执行\code{git add}；}
+  \eitem{对于每个引用旧函数的地方，重构引用新函数，确保编译、测试通过，执行\code{git add}；}    
+  \eitem{删除旧函数，确保编译、测试通过，执行\code{git commit}。}      
+\end{enum}
+
+\end{content}
+\end{episode}
+
+\subsection{引入泛型}
+
+设计的坏味道非常明显，\ascii{run}函数与\ascii{WasRun}类型强度耦合，不够泛化。不仅无法搬迁\ascii{run}函数到产品代码中，而且不易被其他测试用例复用。例如，增加测试用例\ascii{WasSucc}，不得不再重复实现\ascii{run}函数的逻辑。
+
+\begin{diff}{test/mars/core/WasRunSpec.cc, test/mars/core/WasSuccSpec.cc}
+\begin{minicpp}
+#include <gtest/gtest.h>
+
+namespace {
+  struct WasRun {
+    bool wasRun = false;
+
+    void testMethod() {
+      wasRun = true;
+    }
+  };
+
+  void run(WasRun& self, void(WasRun::*method)()) {
+    (self.*method)();
+  }
+}
+
+TEST(WasRunSpec, make_sure_test_method_be_ran) {
+  WasRun test;
+
+  ASSERT_FALSE(test.wasRun);
+  run(test, &WasRun::testMethod);
+  ASSERT_TRUE(test.wasRun);
+}
+\end{minicpp}
+\tcblower
+\begin{minicpp}
+#include <gtest/gtest.h>
+
+namespace {
+  struct WasSucc {
+    bool wasSucc = false;
+
+    void testMethod() {
+      wasSucc = true;
+    }
+  };
+
+  void run(WasSucc& self, void(WasSucc::*method)()) {
+    (self.*method)();
+  }
+}
+
+TEST(WasRunSpec, make_sure_test_method_be_ran) {
+  WasSucc test;
+
+  ASSERT_FALSE(test.wasSucc);
+  run(test, &WasSucc::testMethod);
+  ASSERT_TRUE(test.wasSucc);
+}
+\end{minicpp}
+\end{diff}
+
+虽然两个测试用例是通过的，但两个特化实现的\ascii{run}函数引入了重复设计。为了消除两者实现的重复设计，可以引入泛型设计。此时，可以在产品代码中创建泛型函数\ascii{run}，并简单实现以消除两个特化实现的\ascii{run}函数。
+
+\begin{nodiff}{include/mars/core/TestMethod.h}
+\begin{c++}
+#ifndef HD3E38C9A_3B03_48CE_9A1B_75B41CB012C6
+#define HD3E38C9A_3B03_48CE_9A1B_75B41CB012C6
+
+template <typename Fixture>
+void run(Fixture& self, void(Fixture::*method)()) {
+  (self.*method)();
+}
 
 #endif
-  \end{c++}
+\end{c++}
 \end{nodiff}
 
 \begin{episode}{头文件保护宏}
@@ -302,6 +536,188 @@ struct TestCase {
 
 \end{content}
 \end{episode}
+
+以\ascii{WasRunSpec.cc}为例，使用泛化的\ascii{run}函数，替代特化的\ascii{run}函数，其效果如下所示。同理，\ascii{WasSuccSpec.cc}使用相同的重构方法应用泛化的\ascii{run}函数。最终消除了两者之间的重复设计，并驱动出产品的初始代码。
+
+\begin{nodiff}{test/mars/core/WasRunSpec.cc}
+\begin{c++}
+#include <mars/core/TestMethod.h>
+#include <gtest/gtest.h>
+
+namespace {
+  struct WasRun {
+    bool wasRun = false;
+
+    void testMethod() {
+      wasRun = true;
+    }
+  };
+}
+
+TEST(WasRunSpec, make_sure_test_method_be_ran) {
+  WasRun test;
+
+  ASSERT_FALSE(test.wasRun);
+  run(test, &WasRun::testMethod);
+  ASSERT_TRUE(test.wasRun);
+}
+\end{c++}
+\end{nodiff}
+
+\subsection{自动实例}
+
+\ascii{run}函数虽然已经泛化了，但是它仅仅实现了测试方法的间接调用，其职责也很鸡肋。再次深入客户场景分析，用户更期待能够直接执行\emph{测试方法}，并不期望\emph{测试对象}的创建和维护。重构既有测试用例使其失败，使其\ascii{run}函数不再依赖于具体的测试对象。
+
+\begin{diff}{test/mars/core/WasSuccSpec.cc}
+\begin{minicpp}
+#include <mars/core/TestMethod.h>
+#include <gtest/gtest.h>
+
+namespace {
+  struct WasRun {
+    bool wasRun = false;
+
+    void testMethod() {
+      wasRun = true;
+    }
+  };
+}
+
+TEST(WasRunSpec, make_sure_test_method_be_ran) {
+  WasRun test;
+
+  ASSERT_FALSE(test.wasRun);
+  run(test, &WasRun::testMethod);
+  ASSERT_TRUE(test.wasRun);
+}
+\end{minicpp}
+\tcblower
+\begin{minicpp}
+#include <mars/core/TestMethod.h>
+#include <gtest/gtest.h>
+
+namespace {
+  bool wasRun = false;
+
+  struct WasRun {
+    void testMethod() {
+      wasRun = true;
+    }
+  };
+}
+
+TEST(WasRunSpec, make_sure_test_method_be_ran) {
+  ASSERT_FALSE(wasRun);
+  run(&WasRun::testMethod);
+  ASSERT_TRUE(wasRun);
+}
+\end{minicpp}
+\end{diff}
+
+为了能够快速通过测试，泛化的\ascii{run}函数额外承担测试对象创建和维护的职责。
+
+\begin{diff}{include/mars/core/TestMethod.h}
+\begin{minicpp}
+template <typename Fixture>
+void run(Fixture& self, void(Fixture::*method)()) {
+  (self.*method)();
+}
+\end{minicpp}
+\tcblower
+\begin{minicpp}
+template <typename Fixture>
+void run(void(Fixture::*method)()) {
+  Fixture self;
+  (self.*method)();
+}
+\end{minicpp}
+\end{diff}
+
+\subsection{函数对象}
+
+泛型的\ascii{run}函数，使其持有和维护\emph{测试对象}，限制了\emph{测试对象}的生命周期。引入\emph{函数对象}，替代\ascii{run}函数。重构既有的测试用例，使用函数对象\ascii{TestMethod}替代泛型函数\ascii{run}。
+
+\begin{diff}{test/mars/core/WasRunSpec.cc}
+\begin{minicpp}
+#include <mars/core/TestMethod.h>
+#include <gtest/gtest.h>
+
+namespace {
+  bool wasRun = false;
+
+  struct WasRun {
+    void testMethod() {
+      wasRun = true;
+    }
+  };
+}
+
+TEST(WasRunSpec, make_sure_test_method_was_ran) {
+  ASSERT_FALSE(wasRun);
+  run(&WasRun::testMethod);
+  ASSERT_TRUE(wasRun);
+}
+\end{minicpp}
+\tcblower
+\begin{minicpp}
+#include <mars/core/TestMethod.h>
+#include <gtest/gtest.h>
+
+namespace {
+  bool wasRun = false;
+
+  struct WasRun {
+    void testMethod() {
+      wasRun = true;
+    }
+  };
+}
+
+TEST(WasRunSpec, make_sure_test_method_was_ran) {
+  TestMethod<WasRun> test(&WasRun::testMethod);
+
+  ASSERT_FALSE(wasRun);
+  test.run();
+  ASSERT_TRUE(wasRun);
+}
+\end{minicpp}
+\end{diff}
+
+为了通过测试，引入函数对象\ascii{TestMethod}，它搬迁泛型函数\ascii{run}的主干逻辑。
+
+\begin{diff}{include/mars/core/TestMethod.h}
+\begin{minicpp}
+template <typename Fixture>
+void run(void(Fixture::*method)()) {
+  Fixture self;
+  (self.*method)();
+}
+\end{minicpp}
+\tcblower
+\begin{minicpp}
+template <typename Fixture>
+struct TestMethod {
+private:
+  using Method = void(Fixture::*)();
+
+public:
+  TestMethod(Method method)
+    : method(method) {
+  }
+
+  void run() {
+    (self.*method)();
+  }
+
+private:
+  Fixture self;
+  Method method;
+};
+\end{minicpp}
+\end{diff}
+
+此时，\ascii{TestMethod}持有\emph{测试对象}，并负责执行\emph{测试方法}。相对于普通函数，\ascii{TestMethod}更加具有设计弹性，可以维持其状态实施存储操作。
+
 
 需要关注的是，\ascii{TestCase}实现了一个虚拟析构函数。如果不经意地遗忘声明该析构函数为虚拟的\footnote{默认生成的析构函数是公开的、非虚拟的、内联实现的。}，则可能招致运行时不确定的行为发生。
 
@@ -388,102 +804,6 @@ TRAIT(SelfDescribing) {
 
 \end{content}
 
-\end{episode}
-
-\subsection{通过测试}
-
-在\ascii{build}临时目录中，使用\ascii{cmake}构建工程。
-
-\begin{nodiff}{构建工程}
- \begin{c++}
-$ mkdir -p build && cd build
-$ cmake ..
-$ make
- \end{c++}
-\end{nodiff}
-
-运行测试。
-
-\begin{nodiff}{运行测试}
- \begin{c++}
-$ test/mars-test
-Running main() from gtest_main.cc
-[==========] Running 1 test from 1 test case.
-[----------] Global test environment set-up.
-[----------] 1 test from SimpleTest
-[ RUN      ] SimpleTest.make_sure_test_case_can_run_normally
-[       OK ] SimpleTest.make_sure_test_case_can_run_normally (0 ms)
-[----------] 1 test from SimpleTest (0 ms total)
-
-[----------] Global test environment tear-down
-[==========] 1 test from 1 test case ran. (0 ms total)
-[  PASSED  ] 1 test.
- \end{c++}
-\end{nodiff}
-
-
-
-\begin{episode}{全局忽略模式}
-
-\begin{content}
-
-\ascii{CMake}在临时目录\ascii{build}中完成系统构建，为了避免不经意地将\ascii{build}目录提交至\ascii{Git}库，常常需要在\ascii{.gitignore}文件中配置相应的忽略模式。
-
-但是，为每个项目都创建一个\ascii{.gitignore}文件，显然是一种重复设计。因此，配置全局忽略模式是一个更恰当的解决方案。
-
- \begin{c++}
-$ git config --global core.excludesfile ~/.gitignore_global
-$ vi ~/.gitignore_global
-# cmake
-build/
-
-# vi
-*.swp
-
-# eclipse
-.project
-.cproject
-.settings/
-
-# tex
-output/
- \end{c++}
-
-\end{content}
-\end{episode}
-
-\subsection{提交代码}
-
-每当通过测试后，立即提交代码到\ascii{Git}库。
-
-\begin{nodiff}{提交代码}
- \begin{c++}
-$ git add -A .
-$ git commit -m"pass first test case"
- \end{c++}
-\end{nodiff}
-
-\begin{episode}{后悔药}
-
-\begin{content}
-
-感谢\ascii{Linus}创造了\ascii{Linux}与\ascii{Git}，让全世界的程序员得以享受编程的快乐。\ascii{TDD}精髓之一便是“小”，配合运用\ascii{Git}，简直就是完美，避免不经意的错误而丢失代码。
-
-养成经常性提交代码至\ascii{Git}库，是一种良好的编程习惯。在\ascii{TDD}的一个迭代循环中，每当编译通过，链接通过，测试通过，关键重构成功，都应立即执行\ascii{git add}。当设计重构至相对合理状态，最后执行\ascii{git commit}入库，完成一次\ascii{TDD}的闭环。
-
-此外，借助于\ascii{Git}，随时可以吃后悔药。当尝试某种重构设计时，没有达到预期效果，则可以轻松回到上一个稳定状态，重新开始尝试新的努力。以“重命名函数”的重构过程为例，讲述\ascii{Git}的操作。
-
-\begin{enum}
-  \eitem{新建一个函数；}
-  \eitem{拷贝旧函数的实现至新函数；}
-  \eitem{确保编译、测试通过，执行\code{git add}；}  
-  \eitem{删除旧函数的实现逻辑，转调新函数；}
-  \eitem{确保编译、测试通过，执行\code{git add}；}
-  \eitem{对于每个引用旧函数的地方，重构引用新函数，确保编译、测试通过，执行\code{git add}；}    
-  \eitem{删除旧函数，确保编译、测试通过，执行\code{git commit}。}      
-\end{enum}
-
-\end{content}
 \end{episode}
 
 \end{content}
