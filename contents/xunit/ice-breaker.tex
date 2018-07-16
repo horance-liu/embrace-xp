@@ -8,11 +8,19 @@
 
 \begin{content}
 
+本章将开启\ascii{xUnit Mars}开发之旅。首先，构建\ascii{xUnit Mars}项目的开发环境，包括物理组织，构建系统，代码仓库，集成开发环境。然后，重点描述第一个测试用例诞生的全过程，体验\ascii{TDD}的开发节奏，透视设计权衡的细节之处。
+
+% 鉴别设计的坏味道，通过重构得到简单设计，这就是软件设计内在的美感。犹如遇到一件困难的事情，采用最简单的方法，漂亮地攻克了这个问题，这种成就感油然而生。优美的设计，简单的实现，是所有程序员梦寐追求的目标之一。
+
 \end{content}
 
 \section{编程环境}
 
 \begin{content}
+
+\ascii{xUnit Mars}采用现代风格的\cpp{}语言实现。\cpp{}是一门极其复杂的程序设计语言，拥有强悍的抽象能力与设计工具，但也存在众多瑕疵为人所诟病。
+
+我们会尽最大可能地使用语言的优秀特性，去其糟粕，取其精华。我们不推崇故弄玄虚，奇技淫巧的价值观与方法论。关注问题与软件设计本身，是我们讨论的重点，甚至与语言实现无关。
 
 \subsection{系统配置}
 
@@ -31,46 +39,14 @@
 
 \subsection{项目组织}
 
-项目\ascii{xUnit Mars}物理目录如\refig{mars-project}所示。
+项目\ascii{xUnit Mars}物理目录如\refig{mars-project}所示。此处将头文件，实现文件，测试文件相分离，纯属个人偏好。我也很推崇\ascii{Google}风格，将头文件，实现文件，测试文件放一起，易于工程管理。
 
-\begin{figure}
+\begin{figure}[H]
 \centering
 \includegraphics[width=0.6\textwidth]{figures/xunit/mars-project.png}
 \caption{xUnit Mars: 项目组织}
  \label{fig:mars-project}
 \end{figure}
-
-\begin{episode}{代码风格}
-
-\begin{content}
-
-\emph{团队成员遵循\ascii{XP}基本价值观，致力于优秀的软件设计。}系统中所有的代码看起来就好像是由单独一个值得胜任的人编写的，并遵循一致的、统一的的代码风格。
-
-可以配置\ascii{Eclipse CDT}代码模板，团队通过导入代码模板，使其得到一致的代码风格。业界存在多种经典的代码风格，团队应该选择并保持其中一种代码风格。
-
-\begin{enum}
-  \eitem{\code{K\&R}}
-  \eitem{\code{BSD/Allman}}
-  \eitem{\code{GNU}}
-  \eitem{\code{Whitesmiths}}
-\end{enum}
-
-本书使用\ascii{K\&R}的代码风格，但在对齐方面做了细微调整，如\refig{eclipse-formatter}所示。配置完毕之后，便可以充分享受神奇带来的快感。
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=1.0\textwidth]{figures/xunit/eclipse-formatter.png}
-\caption{代码风格: K\&R}
- \label{fig:eclipse-formatter}
-\end{figure}
-
-例如，创建头文件时，自动生成\ascii{UUID}的头文件保护宏，彻底抛弃这个遗留问题；当需要排版代码时，使用快捷键\ascii{Ctrl + Shift + F}立马得到漂亮的代码风格。
-
-关于\ascii{Eclipse CDT}详细配置与使用技巧，推荐阅读王博\footnote{\href{https://www.jianshu.com/u/92b7d9879f20}{\ascii{https://www.jianshu.com/u/92b7d9879f20}}}在简书上的三篇博文：\href{https://www.jianshu.com/p/dafcdce1f9cb}{\ascii{Effective Eclipse CDT}}。
-
-\end{content}
-
-\end{episode}
 
 \subsection{构建系统}
 
@@ -128,15 +104,45 @@ $ git commit -m"setup cmake project"
  \end{c++}
 \end{nodiff}
 
+\begin{episode}{全局忽略模式}
+\begin{content}
+
+\ascii{CMake}在临时目录\ascii{build}中完成系统构建，为了避免不经意地将\ascii{build}目录提交至\ascii{Git}库，常常需要在\ascii{.gitignore}文件中配置相应的忽略模式。
+
+但是，为每个项目都创建一个\ascii{.gitignore}文件，显然是一种重复设计。因此，配置全局忽略模式是一个更恰当的解决方案。
+
+ \begin{c++}
+$ git config --global core.excludesfile ~/.gitignore_global
+$ vi ~/.gitignore_global
+# cmake
+build/
+
+# vi
+*.swp
+
+# eclipse
+.project
+.cproject
+.settings/
+
+# tex
+output/
+ \end{c++}
+
+\end{content}
+\end{episode}
+
 \end{content}
 
-\section{起航}
+\section{伊始}
 
 \begin{content}
 
-\subsection{测试用例}
+万事开头难，说得没错。但更重要的是，要努力让事情一开始就是对的。学习如此，生活亦如此，凡事大抵莫能例外。关键如何知道自己就是对的那个人呢？反馈，是一种有效的信息传递机制。刺激变化，让测试尽早模拟客户现场，并挖掘潜在的抽象。
 
-万事开头难，第一个用例跑起来并不容易。此处模拟设计了一个\ascii{xUnit Mars}风格的测试用例\ascii{WasRun}，它包含了一个\emph{测试方法}：\ascii{WasRun::testMethod}，它是\ascii{WasRun}的一个成员函数。
+\subsection{初出茅庐}
+
+但是，将第一个测试用例跑起来并不容易。这里尝试模拟设计一个\ascii{xUnit Mars}风格的测试用例，将其命名为\ascii{WasRun}，它包含了一个\emph{测试方法}：\ascii{WasRun::testMethod}。当测试方法\ascii{WasRun::testMethod}被执行后，断言其状态与行为是否符合预期。
 
 \begin{nodiff}{test/mars/core/WasRunSpec.cc}
 \begin{c++}
@@ -162,14 +168,16 @@ TEST(WasRunSpec, make_sure_test_method_be_ran) {
 \end{c++}
 \end{nodiff}
 
-但是，这个测试很鸡肋，不仅天然地通过，而且不能驱动出任何的产品代码。再仔细思考一下，\ascii{xUnit Mars}的职责就是负责调度和执行\emph{测试方法}的，其应该对外开放执行\emph{测试方法}的\ascii{API}。因为\ascii{testMethod}是\ascii{WasRun}的一个成员函数，要调用该测试方法，必须具备两个条件：
+但是这个测试很鸡肋，不仅天然地通过，而且不能驱动出任何的产品代码。仔细思量，\ascii{xUnit Mars}引擎主要负责组织、调度和执行测试用例，它应该对外开放执行\emph{测试方法}的\ascii{API}。而\ascii{testMethod}是\ascii{WasRun}的一个成员函数，除了可以通过\code{test.testMethod}实现\emph{直接调用}之外，还可以通过指向成员函数的指针实现\emph{间接调用}。其中，后者须具备两个基本条件：
 
 \begin{enum}
-  \eitem{测试对象：\code{WasRun}对象；}
-  \eitem{测试方法：\code{WasRun::testMethod}成员函数，或指向该成员函数的指针。}
+  \eitem{测试对象：\code{WasRun}实例；}
+  \eitem{测试方法：指向成员函数\code{WasRun::testMethod}的指针。}
 \end{enum}
 
-因此，引入\ascii{xUnit Mars}执行测试方法的\ascii{run}函数，其第一个参数接受\ascii{WasRun}的测试对象，第二个参数接受指向成员函数\ascii{WasRun::testMethod}的指针。相比之前的测试用例，该测试可以驱动出部分实现；虽然进步甚微，但已迈出具有实际意义的第一步。
+\subsubsection{零号用例}
+
+据此，引入\ascii{xUnit Mars}执行测试方法的核心\ascii{API}：\ascii{run}函数。其第一个参数接受\ascii{WasRun}的测试对象，第二个参数接受指向成员函数\ascii{WasRun::testMethod}的指针。相比之前的测试用例，该测试用例可以驱动出部分实现，虽然进步甚微，但已迈出具有实质意义的第一步。
 
 \begin{diff}{test/mars/core/WasRunSpec.cc}
 \begin{minicpp}
@@ -216,6 +224,82 @@ TEST(WasRunSpec, make_sure_test_method_be_ran) {
 }
 \end{minicpp}
 \end{diff}
+
+\subsubsection{通过测试}
+
+不幸的是，\ascii{run}函数依赖于具体类型\ascii{WasRun}，而\ascii{WarRun}存在于匿名命名空间内。我们不期望将\ascii{WasRun}搬迁至产品实现中，毕竟\ascii{WarRun}是一个用户自定义的\ascii{xUnit Mars}风格的测试用例。
+
+在不破坏匿名命名空间的封装性，且不将测试代码搬迁至产品代码的前提之下，为了快速通过测试用例，姑且就近实现\ascii{run}函数。
+
+\begin{nodiff}{test/mars/core/WasRunSpec.cc}
+\begin{c++}
+#include <gtest/gtest.h>
+
+namespace {
+  struct WasRun {
+    bool wasRun = false;
+
+    void testMethod() {
+      wasRun = true;
+    }
+  };
+
+  void run(WasRun& self, void(WasRun::*method)()) {
+    (self.*method)();
+  }
+}
+
+TEST(WasRunSpec, make_sure_test_method_be_ran) {
+  WasRun test;
+  ASSERT_FALSE(test.wasRun);
+
+  run(test, &WasRun::testMethod);
+  ASSERT_TRUE(test.wasRun);
+}
+\end{c++}
+\end{nodiff}
+
+\subsubsection{执行测试}
+
+在\ascii{build}临时目录中，使用\ascii{cmake}构建工程。
+
+\begin{nodiff}{构建工程}
+ \begin{c++}
+$ mkdir -p build && cd build
+$ cmake ..
+$ make
+ \end{c++}
+\end{nodiff}
+
+运行测试。
+
+\begin{nodiff}{运行测试}
+ \begin{c++}
+$ test/mars-test
+Running main() from gtest_main.cc
+[==========] Running 1 test from 1 test case.
+[----------] Global test environment set-up.
+[----------] 1 test from SimpleTest
+[ RUN      ] SimpleTest.make_sure_test_case_can_run_normally
+[       OK ] SimpleTest.make_sure_test_case_can_run_normally (0 ms)
+[----------] 1 test from SimpleTest (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test case ran. (0 ms total)
+[  PASSED  ] 1 test.
+ \end{c++}
+\end{nodiff}
+
+\subsubsection{提交代码}
+
+每当通过测试后，立即提交代码到\ascii{Git}库。
+
+\begin{nodiff}{提交代码}
+ \begin{c++}
+$ git add -A .
+$ git commit -m"pass first test case"
+ \end{c++}
+\end{nodiff}
 
 \begin{episode}{TDD: 测试驱动开发}
 
@@ -299,137 +383,9 @@ TEST(WasRunSpec, make_sure_test_method_be_ran) {
 
 \end{episode}
 
-\subsubsection{通过测试}
-
-不幸的是，\ascii{run}函数依赖于具体类型\ascii{WasRun}，而\ascii{WarRun}存在于匿名命名空间内。我们不期望将\ascii{WasRun}搬迁至产品实现中，毕竟\ascii{WarRun}是一个用户自定义的\ascii{xUnit Mars}风格的测试用例。
-
-为了快速通过测试用例，且不破坏匿名命名空间的封装性，姑且就近实现\ascii{run}函数，暂时不搬迁\ascii{run}函数至产品代码之中。
-
-\begin{nodiff}{test/mars/core/WasRunSpec.cc}
-\begin{c++}
-#include <gtest/gtest.h>
-
-namespace {
-  struct WasRun {
-    bool wasRun = false;
-
-    void testMethod() {
-      wasRun = true;
-    }
-  };
-
-  void run(WasRun& self, void(WasRun::*method)()) {
-    (self.*method)();
-  }
-}
-
-TEST(WasRunSpec, make_sure_test_method_be_ran) {
-  WasRun test;
-  ASSERT_FALSE(test.wasRun);
-
-  run(test, &WasRun::testMethod);
-  ASSERT_TRUE(test.wasRun);
-}
-\end{c++}
-\end{nodiff}
-
-\subsubsection{执行测试}
-
-在\ascii{build}临时目录中，使用\ascii{cmake}构建工程。
-
-\begin{nodiff}{构建工程}
- \begin{c++}
-$ mkdir -p build && cd build
-$ cmake ..
-$ make
- \end{c++}
-\end{nodiff}
-
-运行测试。
-
-\begin{nodiff}{运行测试}
- \begin{c++}
-$ test/mars-test
-Running main() from gtest_main.cc
-[==========] Running 1 test from 1 test case.
-[----------] Global test environment set-up.
-[----------] 1 test from SimpleTest
-[ RUN      ] SimpleTest.make_sure_test_case_can_run_normally
-[       OK ] SimpleTest.make_sure_test_case_can_run_normally (0 ms)
-[----------] 1 test from SimpleTest (0 ms total)
-
-[----------] Global test environment tear-down
-[==========] 1 test from 1 test case ran. (0 ms total)
-[  PASSED  ] 1 test.
- \end{c++}
-\end{nodiff}
-
-\begin{episode}{全局忽略模式}
-
-\begin{content}
-
-\ascii{CMake}在临时目录\ascii{build}中完成系统构建，为了避免不经意地将\ascii{build}目录提交至\ascii{Git}库，常常需要在\ascii{.gitignore}文件中配置相应的忽略模式。
-
-但是，为每个项目都创建一个\ascii{.gitignore}文件，显然是一种重复设计。因此，配置全局忽略模式是一个更恰当的解决方案。
-
- \begin{c++}
-$ git config --global core.excludesfile ~/.gitignore_global
-$ vi ~/.gitignore_global
-# cmake
-build/
-
-# vi
-*.swp
-
-# eclipse
-.project
-.cproject
-.settings/
-
-# tex
-output/
- \end{c++}
-
-\end{content}
-\end{episode}
-
-\subsubsection{提交代码}
-
-每当通过测试后，立即提交代码到\ascii{Git}库。
-
-\begin{nodiff}{提交代码}
- \begin{c++}
-$ git add -A .
-$ git commit -m"pass first test case"
- \end{c++}
-\end{nodiff}
-
-\begin{episode}{后悔药}
-
-\begin{content}
-
-感谢\ascii{Linus}创造了\ascii{Linux}与\ascii{Git}，让全世界的程序员得以享受编程的快乐。\ascii{TDD}精髓之一便是“小”，配合运用\ascii{Git}，简直就是完美，避免不经意的错误而丢失代码。
-
-养成经常性提交代码至\ascii{Git}库，是一种良好的编程习惯。在\ascii{TDD}的一个迭代循环中，每当编译通过，链接通过，测试通过，关键重构成功，都应立即执行\ascii{git add}。当设计重构至相对合理状态，最后执行\ascii{git commit}入库，完成一次\ascii{TDD}的闭环。
-
-此外，借助于\ascii{Git}，随时可以吃后悔药。当尝试某种重构设计时，没有达到预期效果，则可以轻松回到上一个稳定状态，重新开始尝试新的努力。以“重命名函数”的重构过程为例，讲述\ascii{Git}的操作。
-
-\begin{enum}
-  \eitem{新建一个函数；}
-  \eitem{拷贝旧函数的实现至新函数；}
-  \eitem{确保编译、测试通过，执行\code{git add}；}  
-  \eitem{删除旧函数的实现逻辑，转调新函数；}
-  \eitem{确保编译、测试通过，执行\code{git add}；}
-  \eitem{对于每个引用旧函数的地方，重构引用新函数，确保编译、测试通过，执行\code{git add}；}    
-  \eitem{删除旧函数，确保编译、测试通过，执行\code{git commit}。}      
-\end{enum}
-
-\end{content}
-\end{episode}
-
 \subsection{引入泛型}
 
-设计的坏味道非常明显，\ascii{run}函数与\ascii{WasRun}类型强度耦合，不够泛化。不仅无法搬迁\ascii{run}函数到产品代码中，而且不易被其他测试用例复用。例如，增加测试用例\ascii{WasSucc}，不得不再重复实现\ascii{run}函数的逻辑。
+设计的坏味道非常明显，\ascii{run}函数与\ascii{WasRun}类型强度耦合，不够泛化。不仅无法搬迁\ascii{run}函数到产品代码中，而且不易被其他测试用例复用。新增测试用例\ascii{WasSucc}时，不得不再次重复实现\ascii{run}函数的基本逻辑。
 
 \begin{diff}{test/mars/core/WasRunSpec.cc, test/mars/core/WasSuccSpec.cc}
 \begin{minicpp}
@@ -485,7 +441,7 @@ TEST(WasRunSpec, make_sure_test_method_be_ran) {
 \end{minicpp}
 \end{diff}
 
-虽然两个测试用例是通过的，但两个特化实现的\ascii{run}函数引入了重复设计。为了消除两者实现的重复设计，可以引入泛型设计。此时，可以在产品代码中创建泛型函数\ascii{run}，并简单实现以消除两个特化实现的\ascii{run}函数。
+虽然两个测试用例是通过的，但两个特化实现的\ascii{run}函数引入了明显的重复设计。为了消除两者实现的重复设计，可以在产品代码中创建模板函数\ascii{run}。
 
 \begin{nodiff}{include/mars/core/TestMethod.h}
 \begin{c++}
@@ -537,7 +493,7 @@ void run(Fixture& self, void(Fixture::*method)()) {
 \end{content}
 \end{episode}
 
-以\ascii{WasRunSpec.cc}为例，使用泛化的\ascii{run}函数，替代特化的\ascii{run}函数，其效果如下所示。同理，\ascii{WasSuccSpec.cc}使用相同的重构方法应用泛化的\ascii{run}函数。最终消除了两者之间的重复设计，并驱动出产品的初始代码。
+以\ascii{WasRunSpec.cc}为例，使用泛化的\ascii{run}函数，替代特化的\ascii{run}函数，其效果如下所示。同理，\ascii{WasSuccSpec.cc}使用相同的重构方法应用泛化的\ascii{run}函数，最终消除了两者之间的重复设计，并驱动出产品的初始代码。
 
 \begin{nodiff}{test/mars/core/WasRunSpec.cc}
 \begin{c++}
@@ -566,7 +522,7 @@ TEST(WasRunSpec, make_sure_test_method_be_ran) {
 
 \subsection{自动实例}
 
-\ascii{run}函数虽然已经泛化了，但是它仅仅实现了测试方法的间接调用，其职责也很鸡肋。再次深入客户场景分析，用户更期待能够直接执行\emph{测试方法}，并不期望\emph{测试对象}的创建和维护。重构既有测试用例使其失败，使其\ascii{run}函数不再依赖于具体的测试对象。
+\ascii{run}函数虽然已经泛化了，但是它仅仅实现了测试方法的间接调用，其职责也很鸡肋。再次深入分析客户现场，用户更期待能够直接执行\emph{测试方法}，并不期望还要负责创建和维护相关的\emph{测试对象}。重构既有测试用例使其失败，使其\ascii{run}函数不再依赖于具体的测试对象。
 
 \begin{diff}{test/mars/core/WasSuccSpec.cc}
 \begin{minicpp}
@@ -614,7 +570,7 @@ TEST(WasRunSpec, make_sure_test_method_be_ran) {
 \end{minicpp}
 \end{diff}
 
-为了能够快速通过测试，泛化的\ascii{run}函数额外承担测试对象创建和维护的职责。
+为了能够快速通过测试，泛化的\ascii{run}函数额外承担\emph{测试对象}创建和维护的职责。此处，\ascii{xUnit Mars}执行引擎与客户建立了一个隐式的契约关系：\emph{测试对象必须具有默认构造函数，否则编译失败}。目前，这个契约已经在\ascii{xUnit}社区得到了一致的认可。
 
 \begin{diff}{include/mars/core/TestMethod.h}
 \begin{minicpp}
@@ -635,7 +591,9 @@ void run(void(Fixture::*method)()) {
 
 \subsection{函数对象}
 
-泛型的\ascii{run}函数，使其持有和维护\emph{测试对象}，限制了\emph{测试对象}的生命周期。引入\emph{函数对象}，替代\ascii{run}函数。重构既有的测试用例，使用函数对象\ascii{TestMethod}替代泛型函数\ascii{run}。
+泛型的\ascii{run}函数，它创建和持有\emph{测试对象}，其极大地限制了\emph{测试对象}生命周期的管理。重构既有的测试用例，引入函数对象\ascii{TestMethod}替代模板函数\ascii{run}。
+
+由于篇幅限制，此处未能逐一显示重构的每个细节，需要注意重构的安全步骤。切忌马上替换既有的测试用例，及其\ascii{run}函数的实现。正确的重构步骤，应该先增加新的测试用例，然后再实现函数对象\ascii{TestMethod}，保证通过新的测试用例之后，再删除既有的测试用例，及其\ascii{run}函数。
 
 \begin{diff}{test/mars/core/WasRunSpec.cc}
 \begin{minicpp}
@@ -683,7 +641,7 @@ TEST(WasRunSpec, make_sure_test_method_was_ran) {
 \end{minicpp}
 \end{diff}
 
-为了通过测试，引入函数对象\ascii{TestMethod}，它搬迁泛型函数\ascii{run}的主干逻辑。
+为了通过测试，函数对象\ascii{TestMethod}搬迁模板函数\ascii{run}的主干逻辑。
 
 \begin{diff}{include/mars/core/TestMethod.h}
 \begin{minicpp}
@@ -716,95 +674,107 @@ private:
 \end{minicpp}
 \end{diff}
 
-此时，\ascii{TestMethod}持有\emph{测试对象}，并负责执行\emph{测试方法}。相对于普通函数，\ascii{TestMethod}更加具有设计弹性，可以维持其状态实施存储操作。
+此时，\ascii{TestMethod}持有\emph{测试对象}，并负责执行\emph{测试方法}。相对于普通函数，\ascii{TestMethod}更具设计弹性的空间，可以维持其状态实施存储、传递与返回函数对象。
 
+\begin{episode}{后悔药}
 
-需要关注的是，\ascii{TestCase}实现了一个虚拟析构函数。如果不经意地遗忘声明该析构函数为虚拟的\footnote{默认生成的析构函数是公开的、非虚拟的、内联实现的。}，则可能招致运行时不确定的行为发生。
-
-\begin{episode}{虚拟析构函数}
 \begin{content}
 
-一般地，需要为\emph{多态基类}声明虚拟析构函数；否则，会招致运行时不可预期的行为。一般地，如果一个类包含虚函数时，便将其析构函数声明为虚拟的。
+感谢\ascii{Linus}创造了\ascii{Linux}与\ascii{Git}，让全世界的程序员得以享受编程的快乐。\ascii{TDD}精髓之一便是“小”，配合运用\ascii{Git}，简直就是完美，避免不经意的错误而丢失代码。
 
-\subsubsection{空实现}
+养成经常性提交代码至\ascii{Git}库，是一种良好的编程习惯。在\ascii{TDD}的一个迭代循环中，每当编译通过，链接通过，测试通过，关键重构成功，都应立即执行\ascii{git add}。当设计重构至相对合理状态，最后执行\ascii{git commit}入库，完成一次\ascii{TDD}的闭环。
 
-但是，为每个接口类型实现一个空的虚拟析构函数，显得重复而且麻烦。可以引入一个宏定义，自动引入空实现的虚拟析构函数。
+此外，借助于\ascii{Git}，随时可以吃后悔药。当尝试某种重构设计时，没有达到预期效果，则可以轻松回到上一个稳定状态，重新开始尝试新的努力。以“重命名函数”的重构过程为例，讲述\ascii{Git}的操作。
 
- \begin{c++}
-namespace details {
-  template<typename T>
-  struct Trait {
-    virtual ~Trait() {}
-  };
-}
-
-#define TRAIT(trait)  struct trait : ::details::Trait<trait>
-#define EXTENDS(...) , ##__VA_ARGS__
- \end{c++}
-
-例如，使用\ascii{TRAIT}宏，定义了一个接口类型\ascii{SelfDescribing}，它自动拥有虚拟析构函数的默认空实现。
-
- \begin{c++}
-struct Description;
-
-TRAIT(SelfDescribing) {
-  virtual void describeTo(Description& desc) const = 0;
-};
- \end{c++}
-
-\subsubsection{抽象函数}
-
-此外，定义纯虚函数时，常常会遗忘后面的\ascii{0}。可以引入另外一个宏定义。
-
- \begin{c++}
-#define ABSTRACT(...) virtual __VA_ARGS__ = 0
- \end{c++}
-
-使用\ascii{ABSTRACT}定义，不仅可以抑制不经意地遗漏\ascii{0}的错误，也可以改善\ascii{API}的意图和可读性。
-
-\begin{c++}
-struct Description;
-
-TRAIT(SelfDescribing) {
-  ABSTRACT(void describeTo(Description& desc) const);
-};
-\end{c++}
+\begin{enum}
+  \eitem{新建一个函数；}
+  \eitem{拷贝旧函数的实现至新函数；}
+  \eitem{确保编译、测试通过，执行\code{git add}；}  
+  \eitem{删除旧函数的实现逻辑，转调新函数；}
+  \eitem{确保编译、测试通过，执行\code{git add}；}
+  \eitem{对于每个引用旧函数的地方，重构引用新函数，确保编译、测试通过，执行\code{git add}；}    
+  \eitem{删除旧函数，确保编译、测试通过，执行\code{git commit}。}      
+\end{enum}
 
 \end{content}
 \end{episode}
 
-\subsection{通过链接}
+% 需要关注的是，\ascii{TestCase}实现了一个虚拟析构函数。如果不经意地遗忘声明该析构函数为虚拟的\footnote{默认生成的析构函数是公开的、非虚拟的、内联实现的。}，则可能招致运行时不确定的行为发生。
 
-创建一个空的\ascii{TestCase.cc}文件，这里仅为了\ascii{libmars.a}不为空，保证\ascii{CMake}构建系统工作正常；否则，\ascii{CMake}提示\ascii{mars}项目为空，无法构建\ascii{libmars.a}库。
+% \begin{episode}{虚拟析构函数}
+% \begin{content}
 
-\begin{nodiff}{src/mars/core/TestCase.cc}
- \begin{c++}
-#include "mars/core/TestCase.h"
- \end{c++}
-\end{nodiff}
+% 一般地，需要为\emph{多态基类}声明虚拟析构函数；否则，会招致运行时不可预期的行为。一般地，如果一个类包含虚函数时，便将其析构函数声明为虚拟的。
 
-\begin{episode}{多屏编辑}
+% \subsubsection{空实现}
 
-\begin{content}
+% 但是，为每个接口类型实现一个空的虚拟析构函数，显得重复而且麻烦。可以引入一个宏定义，自动引入空实现的虚拟析构函数。
 
-在\cpp{}编程实践中，需要在头文件和实现文件之间频繁切换。同时，在\ascii{TDD}编程实践中，也需要在测试文件与头文件/实现文件之间频繁切换。
+%  \begin{c++}
+% namespace details {
+%   template<typename T>
+%   struct Trait {
+%     virtual ~Trait() {}
+%   };
+% }
 
-得益于现代\ascii{IDE}的丰富特性，推荐多屏显示相关源文件。例如，如\refig{multi-editor-eclipse}所示，使用\ascii{Eclipse CDT}，三屏分别显示相关联的头文件、实现文件，及其测试用例文件。
+% #define TRAIT(trait)  struct trait : ::details::Trait<trait>
+% #define EXTENDS(...) , ##__VA_ARGS__
+%  \end{c++}
 
-\begin{figure}[H]
-\centering
-\includegraphics[width=1.0\textwidth]{figures/xunit/multi-editor-eclipse.png}
-\caption{Eclipse CDT: 多屏显示}
- \label{fig:multi-editor-eclipse}
-\end{figure}
+% 例如，使用\ascii{TRAIT}宏，定义了一个接口类型\ascii{SelfDescribing}，它自动拥有虚拟析构函数的默认空实现。
 
-推荐购置高清，大屏显示器，有效改善编程环境，从而提高工作效率。关闭无关的\ascii{Tab}页，只打开当前相关的文件，最小化外部干扰；一则让\ascii{IDE}运行速度最佳，二则使用诸如\ascii{Ctrl + E}快捷键切换文件时，最小化文件列表长度。
+%  \begin{c++}
+% struct Description;
 
-强烈推荐使用快捷键的优秀实践，可以成倍地提高编程的效率。例如，使用快捷键\ascii{Ctrl + Tab}，在头文件与实现文件间切换自如。
+% TRAIT(SelfDescribing) {
+%   virtual void describeTo(Description& desc) const = 0;
+% };
+%  \end{c++}
 
-\end{content}
+% \subsubsection{抽象函数}
 
-\end{episode}
+% 此外，定义纯虚函数时，常常会遗忘后面的\ascii{0}。可以引入另外一个宏定义。
+
+%  \begin{c++}
+% #define ABSTRACT(...) virtual __VA_ARGS__ = 0
+%  \end{c++}
+
+% 使用\ascii{ABSTRACT}定义，不仅可以抑制不经意地遗漏\ascii{0}的错误，也可以改善\ascii{API}的意图和可读性。
+
+% \begin{c++}
+% struct Description;
+
+% TRAIT(SelfDescribing) {
+%   ABSTRACT(void describeTo(Description& desc) const);
+% };
+% \end{c++}
+
+% \end{content}
+% \end{episode}
+
+% \begin{episode}{多屏编辑}
+
+% \begin{content}
+
+% 在\cpp{}编程实践中，需要在头文件和实现文件之间频繁切换。同时，在\ascii{TDD}编程实践中，也需要在测试文件与头文件/实现文件之间频繁切换。
+
+% 得益于现代\ascii{IDE}的丰富特性，推荐多屏显示相关源文件。例如，如\refig{multi-editor-eclipse}所示，使用\ascii{Eclipse CDT}，三屏分别显示相关联的头文件、实现文件，及其测试用例文件。
+
+% \begin{figure}[H]
+% \centering
+% \includegraphics[width=1.0\textwidth]{figures/xunit/multi-editor-eclipse.png}
+% \caption{Eclipse CDT: 多屏显示}
+%  \label{fig:multi-editor-eclipse}
+% \end{figure}
+
+% 推荐购置高清，大屏显示器，有效改善编程环境，从而提高工作效率。关闭无关的\ascii{Tab}页，只打开当前相关的文件，最小化外部干扰；一则让\ascii{IDE}运行速度最佳，二则使用诸如\ascii{Ctrl + E}快捷键切换文件时，最小化文件列表长度。
+
+% 强烈推荐使用快捷键的优秀实践，可以成倍地提高编程的效率。例如，使用快捷键\ascii{Ctrl + Tab}，在头文件与实现文件间切换自如。
+
+% \end{content}
+
+% \end{episode}
 
 \end{content}
 

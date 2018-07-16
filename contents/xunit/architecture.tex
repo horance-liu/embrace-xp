@@ -8,25 +8,31 @@
 
 \begin{content}
 
-本书通过使用\cpp{}设计和实现\ascii{xUnit}框架，透视极限编程在\cpp{}社区中的具体实践与运用，包括\ascii{简单设计}，\ascii{TDD}、重构；也会深入体会正交设计、设计原则、设计模式、整洁代码、实现模式与习惯用法在编程实践中的具体运用；也会在面向对象、函数式、泛型编程不同编程范式之间切换自如；也会尝试\ascii{DSL}设计与实现，体会代码之美，设计之美，架构之美。
+本章重点介绍\ascii{xUnit}的基本框架与测试方法论，通过讨论\ascii{Google Test}框架的优缺点，引入\ascii{xUnit Mars}框架，重起炉灶，再造轮子。最后，简单介绍\ascii{xUnit Mars}的用例风格与系统架构。
+
+通过\ascii{xUnit Mars}的设计与实现，探究\ascii{TDD}，重构与简单设计的实践过程，并深入体会正交设计、设计原则、设计模式、整洁代码、实现模式与习惯用法在编程实践中的具体运用。
+
+% 本书通过使用\cpp{}设计和实现\ascii{xUnit}框架，透视极限编程在\cpp{}社区中的具体实践与运用，包括\ascii{简单设计}，\ascii{TDD}、重构。
+
+% 也会深入体会正交设计、设计原则、设计模式、整洁代码、实现模式与习惯用法在编程实践中的具体运用；也会在面向对象、函数式、泛型编程不同编程范式之间切换自如；也会尝试\ascii{DSL}设计与实现，体会代码之美，设计之美，架构之美。
 
 \end{content}
 
-\section{xUnit家谱}
+\section{xUnit族谱}
 
 \begin{content}
 
+\subsection{开山鼻祖}
+
 \ascii{xUnit}表示一组单元测试框架集合，其基本思想起源于\ascii{SUnit}。\ascii{SUnit}由极限编程之父\ascii{Kent Beck}使用\ascii{SmallTalk}设计实现。随后，\ascii{Kent Beck}与\ascii{Erich Gamma}结对编程，移植实现了\ascii{Java}版本\ascii{JUnit}。
 
-\ascii{JUnit}随着\ascii{Java}社区不断壮大，及其敏捷软件开发思潮的涌现，当前\ascii{JUnit}已经成为\ascii{Java}程序员最常使用的框架之一。而且\ascii{JUnit}也在不断地进化与演进，截止目前\ascii{JUnit5}已然面世，焕发青春。
+\ascii{JUnit}随着\ascii{Java}社区不断壮大，及其敏捷软件开发思潮的涌现，当前\ascii{JUnit}已经成为\ascii{Java}程序员最常使用的框架之一。而且\ascii{JUnit}也在不断地进化与演进，截止目前\ascii{JUnit5}已然面世，重焕青春。
 
-随之，各家语言社区都诞生了自家优秀的\ascii{xUnit}实现，包括基于\ascii{JVM}实现的各种高级编程语言。但是，它们都基本继承或发扬了\ascii{xUnit}基本架构与方法论，而且部分后起之秀在用户界面友好性方面取得极大的改进和提升。例如，我所偏爱的\ascii{Spock, ScalaTest}。
+随之各家语言社区都诞生了自家优秀的\ascii{xUnit}实现，包括基于\ascii{JVM}实现的各种高级编程语言。但是，它们都基本继承或发扬了\ascii{xUnit}基本架构与方法论，部分后起之秀在用户界面友好性方面也取得极大的改进和提升。例如，我所偏爱的\ascii{Spock, ScalaTest}框架。
 
-一方面，归功于编程语言的内在特性，因为部分编程语言天然地支持\ascii{DSL}构建。另一方面，归功于该领域发展的成熟度与良好的竞争环境。例如，基于\cpp{}语言实现的\ascii{xUnit}在社区中就存在众多实现，而且在不断演进和革新。
+\subsection{名家之作}
 
-\subsection{Google Test}
-
-\ascii{Google Test}出自名家，自带光环。其功能强大，系统稳定，移植性良好，支持用例自动发现机制，相对于社区其它\ascii{xUnit}框架更显技高一筹，在\ascii{C++}社区占据主导地位。
+\ascii{Google Test}出自\ascii{Google}，自带光环。其使用\cpp{}语言实现，其功能强大，系统稳定，移植性良好，支持用例自动发现，相对于\cpp{}社区其它\ascii{xUnit}实现更显技高一筹，在\cpp{}社区占据主导地位。
 
 \begin{nodiff}{Google Test样例}
  \begin{c++}
@@ -163,7 +169,7 @@ protected:
   \end{c++}
 \end{nodiff}
 
-\subsection{xUnit Mars}
+\subsection{拙作}
 
 假定预开发的系统名为\ascii{xUnit Mars}，它完成类似\ascii{Google Test}的功能特性。相对于\ascii{Google Test}，\ascii{xUnit Mars}定义了一套更人性化的\ascii{DSL}，改善了用例描述的表达力。
 
@@ -206,23 +212,49 @@ FIXTURE(StackSpec) {
 
 \end{content}
 
-\section{Mars架构}
+\section{系统架构}
 	
 \begin{content}
 
-\subsection{初步架构}
-
 \ascii{xUnit Mars}功能特性与\ascii{Google Test}存在明显的重合度。但是，\ascii{xUnit Mars}的用例设计风格与系统架构，相比\ascii{Google Test}存在巨大的差异。
 
-在开发初期，\ascii{xUnit Mars}使用\ascii{Google Test}作为\ascii{TDD}的开发工具，待\ascii{xUnit Mars}完成基本功能，并发布稳定版本之后，可将既有测试用例重构为\ascii{xUnit Mars}风格。
+在开发初期，\ascii{xUnit Mars}使用\ascii{Google Test}作为\ascii{TDD}的开发工具，待\ascii{xUnit Mars}完成基本功能，并发布稳定版本之后，可将既有测试用例重构为\ascii{xUnit Mars}风格。基于\ascii{xUnit Mars}基本特性，可以改善使用\ascii{Modern C++}开发各类应用程序的用户体验。初步预想，\ascii{xUnit Mars}系统架构如\refig{mars-framework}所示。
 
-基于\ascii{xUnit Mars}基本特性，可以改善使用\ascii{Modern C++}开发各类应用程序的用户体验。初步预想，\ascii{xUnit Mars}系统架构如\refig{mars-framework}所示。
-
-\begin{figure}
+\begin{figure}[H]
 \centering
 \includegraphics[width=0.5\textwidth]{figures/xunit/framework.png}
 \caption{xUnit Mars: 系统架构}
  \label{fig:mars-framework}
 \end{figure}
+
+\begin{episode}{代码风格}
+\begin{content}
+
+\emph{团队成员遵循\ascii{XP}基本价值观，致力于优秀的软件设计。}系统中所有的代码看起来就好像是由单独一个值得胜任的人编写的，并遵循一致的、统一的的代码风格。
+
+可以配置\ascii{Eclipse CDT}代码模板，团队通过导入代码模板，使其得到一致的代码风格。业界存在多种经典的代码风格，团队应该选择并保持其中一种代码风格。
+
+\begin{enum}
+  \eitem{\code{K\&R}}
+  \eitem{\code{BSD/Allman}}
+  \eitem{\code{GNU}}
+  \eitem{\code{Whitesmiths}}
+\end{enum}
+
+本书使用\ascii{K\&R}的代码风格，但在对齐方面做了细微调整，如\refig{eclipse-formatter}所示。配置完毕之后，便可以充分享受神奇带来的快感。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=1.0\textwidth]{figures/xunit/eclipse-formatter.png}
+\caption{代码风格: K\&R}
+ \label{fig:eclipse-formatter}
+\end{figure}
+
+例如，创建头文件时，自动生成\ascii{UUID}的头文件保护宏，彻底抛弃这个遗留问题；当需要排版代码时，使用快捷键\ascii{Ctrl + Shift + F}立马得到漂亮的代码风格。
+
+关于\ascii{Eclipse CDT}详细配置与使用技巧，推荐阅读王博\footnote{\href{https://www.jianshu.com/u/92b7d9879f20}{\ascii{https://www.jianshu.com/u/92b7d9879f20}}}在简书上的三篇博文：\href{https://www.jianshu.com/p/dafcdce1f9cb}{\ascii{Effective Eclipse CDT}}。
+
+\end{content}
+\end{episode}
 
 \end{content}
