@@ -8,256 +8,552 @@
 
 \begin{content}
 
+本章接着驱动实现\ascii{xUnit Mars}引擎的关键路径，并试图推敲出一个测试用例在运行时的完整生命周期。此时，泛型实现的\ascii{TestMethod}也变得越发臃肿。尝试从泛型实现的\ascii{TestMethod}之中，抽取了非泛型实现的逻辑，并形成\ascii{TestCase}漂亮的模板方法，构建了用例执行的主干逻辑。此时，泛型实现的\ascii{TestMethod}退居\ascii{TestCase}的幕后默默地工作。
+
+将复杂的泛型实施封装和隐藏，对外提供非泛型的\ascii{TestCase}编程接口，极大地降低了系统的复杂度和编译时依赖，设计也变得越发有趣多了。
+
 \end{content}
 
 \section{前置}
 
 \begin{content}
 
-一般地，在执行测试前需要预置\ascii{setUp}，执行测试环境的初始化工作，完成测试资源的准备。对既有的用例实施重构。
+一般地，在执行测试前需要预置\ascii{setUp}，执行测试环境的初始化工作，完成测试资源的准备。
 
-\subsection{测试用例}
+\subsection{曾经沧海}
 
-\begin{diff}{test/mars/core/TestCaseSpec.cc}
- \begin{minicpp}
+重构既有的测试用例使其失败，沿用既有的测试思路，确定\ascii{setUp}事件曾今确实发生过。
+
+\begin{nodiff}{test/mars/core/WasRunSpec.cc}
+\begin{c++}
+#include <mars/core/TestMethod.h>
 #include <gtest/gtest.h>
-#include "mars/core/TestCase.h"
 
 namespace {
-  struct SimpleTest : TestCase {
-    bool wasRun = false;
+  bool wasRun = false;
+  bool wasSetUp = false;
 
-  private:
-    void run() override {
-      wasRun = true;
-    }
-  };
-
-  void run(TestCase& test) {
-    test.run();
-  }
-}
-
-TEST(SimpleTest, make_sure_test_case_can_run_normally) {
-  SimpleTest test;
-  run(test);
-
-  ASSERT_TRUE(test.wasRun);
-}
- \end{minicpp}
-\tcblower
- \begin{minicpp}
-#include <gtest/gtest.h>
-#include "mars/core/TestCase.h"
-
-namespace {
-  struct SimpleTest : TestCase {
-    bool wasSetUp = false;
-    bool wasRun = false;
-
-  private:
-    void setUp() override {
+  struct WasRun {
+    void setUp() {
       wasSetUp = true;
     }
 
-    void runTest() override {
+    void testMethod() {
       wasRun = true;
     }
   };
 }
 
-TEST(SimpleTest, make_sure_test_case_can_run_normally) {
-  SimpleTest test;
+TEST(WasRunSpec, make_sure_test_method_be_ran) {
+  TestMethod<WasRun> test(&WasRun::testMethod);
+
+  ASSERT_FALSE(wasRun);
   test.run();
-
-  ASSERT_TRUE(test.wasSetUp);
-  ASSERT_TRUE(test.wasRun);
+  ASSERT_TRUE(wasRun);
 }
- \end{minicpp} 
-\end{diff}
 
+TEST(WasRunSpec, make_sure_setup_was_ran) {
+  TestMethod<WasRun> test(&WasRun::testMethod);
 
-被覆写的\ascii{SimpleTest::setUp, SimpleTest::runTest}成员函数被显式声明为\ascii{override}与\ascii{private}。前者在编译时完成函数签名的合法性检查，后者限制外部用户使用\ascii{SimpleTest}对象直接调用\ascii{setUp, runTest}成员函数。
+  ASSERT_FALSE(wasSetUp);
+  test.run();
+  ASSERT_TRUE(wasSetUp);
+}
+\end{c++}
+\end{nodiff}
 
-\begin{episode}{private与override}
-\begin{content}
+\subsubsection{显式实现}
 
-\subsubsection{按接口编程}
+逻辑较为简单，直接显式实现。
 
-一般地，在面向对象程序设计中，需要遵循“按接口类型编程”的基本设计原则。在\ascii{C++}设计语言中，基类使用虚函数声明抽象函数，子类使用\ascii{override}覆写虚函数。
+\begin{diff}{include/mars/core/TestMethod.h}
+\begin{minicpp}
+template <typename Fixture>
+struct TestMethod {
+private:
+  using Method = void(Fixture::*)();
 
-在编译时，编译器按照基类的接口类型确定函数调用关系。而在运行时，根据对象的具体类型在相应的虚表中检索对应的成员函数，完成运行时多态的调用。
+public:
+  TestMethod(Method method)
+    : method(method) {}
 
-因此，除非存在特殊的需求，将\ascii{override}函数\ascii{private}化，以明确对外声明：在编译时，无法通过该具体类型实现对\ascii{override}函数的直接调用；推荐使用抽象的基类型，在运行时实现多态调用。
-
-\subsubsection{例外}
-
-凡事都存在例外，被覆写的析构函数就不应该声明为\ascii{private}；否则，无法生成该类型的值对象，因为没办法析构。
-
-\end{content}
-\end{episode}
-
-\subsection{通过编译}
-
-重构\ascii{TestCase}，仅公开\ascii{run}方法，并移除运行时多态的特性，它负责组织用例执行运行时的算法骨架。搬迁运行时多态行为至私有的两个虚函数，用户根据自己的场景定制\ascii{setUp}与\ascii{runTest}，分别完成测试准备，及其测试执行。
-
-\begin{diff}{include/mars/core/TestCase.h}
- \begin{minicpp}
-struct TestCase {
-  virtual void run() = 0;
-  virtual ~TestCase() {}
-}; 
- \end{minicpp}
-\tcblower
- \begin{minicpp}
-struct TestCase {
-  void run();
-  virtual ~TestCase() {}
+  void run() {
+    (self.*method)();
+  }
 
 private:
-  virtual void setUp() {}
-  virtual void runTest() {}
+  Fixture self;
+  Method method;
 };
- \end{minicpp} 
-\end{diff}
+\end{minicpp}
+\tcblower
+\begin{minicpp}
+template <typename Fixture>
+struct TestMethod {
+private:
+  using Method = void(Fixture::*)();
 
+public:
+  TestMethod(Method method)
+    : method(method) {}
 
-\begin{episode}{善用快捷键}
-\begin{content}
-
-\subsubsection{场景1}
-
-在\ascii{C++}编程实践中，需要经常在头文件、实现文件、测试文件中频繁切换；而且头文件声明的成员函数，需要在实现文件中实现。幸运的是，\ascii{Eclipse IDE}提供了相关快捷键，让这些事情变得不再麻烦。
-
-\begin{enum}
-  \eitem{\code{Ctrl + Tab}: 在头文件与实现文件之间切换；}
-  \eitem{\code{Ctrl + E}: 打开最近打开的文件列表；}  
-  \eitem{\code{Alt + Shift + S}: 实现头文件中声明的函数；}      
-  \eitem{\code{Ctrl + Shift + N}: 自动导入缺失的头文件。}      
-\end{enum}
-
-\subsubsection{场景2}
-
-“重命名函数”是最常见的一种重构手法，如果严格遵循重构过程，需要每个步骤都谨小慎微。
-
-\begin{enum}
-  \eitem{新建一个函数；}
-  \eitem{拷贝旧函数的实现至新函数；}
-  \eitem{编译，测试通过；}
-  \eitem{删除旧函数的实现逻辑，转调新函数；}
-  \eitem{编译，测试通过；}
-  \eitem{对于每个引用旧函数的地方，重构引用新函数，确保编译、测试通过；}    
-  \eitem{删除旧函数。}      
-\end{enum}
-
-\ascii{Eclipse IDE}提供了重命名类与函数的快捷键\ascii{Alt + Shift + R}，轻松搞定这件事情。善用快捷键，不仅可以提高编程的效率，也能提高重构的安全性。
-
-\subsubsection{快捷键}
-
-没有必要掌握所有的快捷键，但需要熟悉常用的快捷键。在结对编程实践中，向同伴学习，或推荐同伴，都是一件极其有意思的事情。
-
-\begin{enum}
-  \eitem{大杀器}
-\begin{enum}
-  \eitem{\code{Ctrl + Shift + L}: 列出所有的快捷键，恢复记忆；}
-\end{enum}
-
-  \eitem{导航类}
-\begin{enum}
-  \eitem{\code{Ctrl + Shift + R}: 跳转到特定文件，常使用模糊匹配方式搜索文件；}
-  \eitem{\code{Ctrl + Shift + T}: 跳转至某个符号，例如类，函数，全局变量；}
-  \eitem{\code{Alt + } $\leftarrow/\rightarrow$: 跳转至上一个/下一个编辑点；} 
-  \eitem{\code{Ctrl + E}: 在最近打开的文件列表中切换；}
-  \eitem{\code{Ctrl + O}: 在当前文件中的函数之间切换；}
-  \eitem{\code{Ctrl + Q}: 跳转到最后编辑过的位置；}  
-  \eitem{\code{Ctrl + L}: 跳转至特定的行，定位编译错误很有用；}
-  \eitem{\code{Ctrl + =}: 宏展开；}        
-  \eitem{\code{Ctrl + T}: 查看继承层次；}
-  \eitem{\code{Alt + Shift + S}: 代码生成视图；}
-  \eitem{\code{Alt + Shift + N}: 新建文件视图；}
-\end{enum}
-
-  \eitem{光标类}
-\begin{enum}
-  \eitem{\code{Ctrl + }$\leftarrow/\rightarrow$: 逐单词向左/向右移动光标；}
-  \eitem{\code{Shift + }$\leftarrow/\rightarrow$: 逐字符向左/向右选择；}
-  \eitem{\code{Ctrl + Shift + }$\leftarrow/\rightarrow$: 逐单词向左/向右选择；}
-  \eitem{\code{Shift + Home/End}: 从当前光标选择至行首/行末；}  
-  \eitem{\code{Shift + }$\downarrow/\uparrow$: 选择当前行/上一行；}  
-  \eitem{\code{Ctrl + Shift + }$\downarrow/\uparrow$: 移动光标至下一个/上一个成员；}    
-  \eitem{\code{Ctrl + A}: 全选；}  
-\end{enum}
-      
-  \eitem{编辑类}
-\begin{enum}
-  \eitem{\code{Ctrl + D}: 删除当前行；}
-  \eitem{\code{Alt + }$\uparrow/\downarrow$: 向上/向下移动当前行；}   
-  \eitem{\code{Ctrl + Alt + }$\uparrow/\downarrow$: 向上/向下复制当前行；}     
-  \eitem{\code{Ctrl + Shift + F}: 格式化；}
-  \eitem{\code{Ctrl + Shift + N}: 自动导入缺失的头文件；}  
-  \eitem{\code{Ctrl + Shift + X/Y}: 转为小写/大写；} 
-  \eitem{\code{Alt + Shift + A}: 列模式}
-  \eitem{\code{Alt + Shift + R}: 重命名；}
-  \eitem{\code{Ctrl + Alt + J}: 合并行；}  
-  \eitem{\code{Ctrl + Z}: 撤销；}
-  \eitem{\code{Ctrl + Shift + Z}: 恢复；}      
-\end{enum}
-
-  \eitem{功能键}
-\begin{enum}
-  \eitem{\code{F2}: 重命名文件名；}
-  \eitem{\code{F3}: 跳转类、函数定义；}
-  \eitem{\code{F4}: 查看继承层次；}  
-\end{enum}
-
-  \eitem{注释类}
-\begin{enum}
-  \eitem{\code{Ctrl + }$/$: 单行注释，或取消单行注释；} 
-  \eitem{\code{Ctrl + shift +  }$/$: 多行注释；} 
-  \eitem{\code{Ctrl + shift +  } $\backslash$: 取消多行注释；}   
-\end{enum}
-
-  \eitem{查找类}
-\begin{enum}
-  \eitem{\code{Ctrl + H}: 打开搜索对话框；} 
-  \eitem{\code{Ctrl + K}: 在文件内查找下一个该符号的位置；} 
-  \eitem{\code{Ctrl + Shift + K}: 在文件内查找上一个该符号的位置；}   
-  \eitem{\code{Ctrl + shift + G}: 查找该符号所有的引用；} 
-  \eitem{\code{Ctrl + shift + H}: 查看函数的调用关系；}   
-\end{enum}
-
-\end{enum}
-
-\end{content}
-\end{episode}
-
-\subsection{通过测试}
-
-实现\ascii{TestCase::run}的主体逻辑。
-
-\begin{nodiff}{include/mars/core/TestCase.h, src/mars/core/TestCase.cc}
- \begin{c++}
-struct TestCase {
-  void run();
-  virtual ~TestCase() {}
+  void run() {
+    self.setUp();
+    (self.*method)();
+  }
 
 private:
-  virtual void setUp() {}
-  virtual void runTest() {}
+  Fixture self;
+  Method method;
 };
- \end{c++}
-\tcblower
- \begin{c++}
-#include "mars/core/TestCase.h"
+\end{minicpp}
+\end{diff}
 
-void TestCase::run() {
-  setUp();
-  runTest();
+\subsubsection{重置标记}
+
+运行测试，发现测试执行失败。简单分析，是因为测试之间产生了依赖。此时引入测试夹具\ascii{WasRunSpec}，在\ascii{SetUp}中重置\ascii{wasSetUp, wasRun}标记。
+
+\begin{nodiff}{test/mars/core/WasRunSpec.cc}
+\begin{c++}
+#include <mars/core/TestMethod.h>
+#include <gtest/gtest.h>
+
+namespace {
+  bool wasRun;
+  bool wasSetUp;
+
+  struct WasRun {
+    void setUp() {
+      wasSetUp = true;
+    }
+
+    void testMethod() {
+      wasRun = true;
+    }
+  };
+
+  struct WasRunSpec : testing::Test {
+  private:
+    // IMPORTANT: should reset all flags.
+    void SetUp() override {
+      wasRun = false;
+      wasSetUp = false;
+    }
+  };
 }
- \end{c++} 
+
+TEST_F(WasRunSpec, make_sure_test_method_be_ran) {
+  TestMethod<WasRun> test(&WasRun::testMethod);
+
+  ASSERT_FALSE(wasRun);
+  test.run();
+  ASSERT_TRUE(wasRun);
+}
+
+TEST_F(WasRunSpec, make_sure_setup_be_ran) {
+  TestMethod<WasRun> test(&WasRun::testMethod);
+
+  ASSERT_FALSE(wasSetUp);
+  test.run();
+  ASSERT_TRUE(wasSetUp);
+}
+\end{c++}
 \end{nodiff}
 
 测试通过。
+
+\subsubsection{消除重复}
+
+两个测试用例，存在明显的重复设计。重构测试用例，提取公共实现至测试夹具\ascii{WasRunSpec}之中，消除两者之间的重复逻辑。
+
+\begin{nodiff}{test/mars/core/WasRunSpec.cc}
+\begin{c++}
+#include <mars/core/TestMethod.h>
+#include <gtest/gtest.h>
+
+namespace {
+  bool wasRun;
+  bool wasSetUp;
+
+  struct WasRun {
+    void setUp() {
+      wasSetUp = true;
+    }
+
+    void testMethod() {
+      wasRun = true;
+    }
+  };
+
+  struct WasRunSpec : testing::Test {
+  private:
+    void SetUp() override {
+      wasRun = false;
+      wasSetUp = false;
+    }
+
+  protected:
+    void makeSure(bool invoked) {
+      ASSERT_FALSE(invoked);
+      test.run();
+      ASSERT_TRUE(invoked);      
+    }
+
+  private:
+    TestMethod<WasRun> test = &WasRun::testMethod;
+  };
+}
+
+TEST_F(WasRunSpec, make_sure_test_method_was_ran) {
+  makeSure(wasRun);
+}
+
+TEST_F(WasRunSpec, make_sure_setup_was_ran) {
+  makeSure(wasSetUp);
+}
+\end{c++}
+\end{nodiff}
+
+测试通过，重构完毕。
+
+\subsection{接踵而至}
+
+至此，测试用例确定\ascii{setUp}的确发生过，但完全不确定\ascii{setUp}是否在\ascii{testMethod}之前发生。重构既有测试用例使其失败，验证\ascii{setUp}在\ascii{testMethod}之前被调用。
+
+做法非常简单，增加一个字符串类型的收集器，当测试逻辑被调用时，追加结果到此收集器。最后断言收集器的顺序是否与预期一致。
+
+\begin{nodiff}{test/mars/core/WasRunSpec.cc}
+\begin{c++}
+#include <mars/core/TestMethod.h>
+#include <gtest/gtest.h>
+
+namespace {
+  bool wasRun;
+  bool wasSetUp;
+  std::string result;
+
+  struct WasRun {
+    void setUp() {
+      wasSetUp = true;
+      result += "setUp";
+    }
+
+    void testMethod() {
+      wasRun = true;
+      result += "runTest";
+    }
+  };
+
+  struct WasRunSpec : testing::Test {
+  private:
+    void SetUp() override {
+      wasRun = false;
+      wasSetUp = false;
+      result.clear();
+    }
+
+  protected:
+    void makeSure(bool invoked) {
+      ASSERT_FALSE(invoked);
+      test.run();
+      ASSERT_TRUE(invoked);      
+    }
+
+  protected:
+    TestMethod<WasRun> test = &WasRun::testMethod;
+  };
+}
+
+TEST_F(WasRunSpec, make_sure_test_method_was_ran) {
+  makeSure(wasRun);
+}
+
+TEST_F(WasRunSpec, make_sure_setup_was_ran) {
+  makeSure(wasSetUp);
+}
+
+TEST_F(WasRunSpec, should_setup_before_running_test) {
+  test.run();
+  ASSERT_EQ("[setUp][runTest]", result);
+}
+\end{c++}
+\end{nodiff}
+
+\subsubsection{消除重复}
+
+使用字符串类型的收集器，其测试范围更具覆盖性，它完全覆盖原来采用布尔类型\ascii{wasRun, wasSetUp}标记位的方法。为了消除重复的测试逻辑，可以删除标记位\ascii{wasRun, wasSetUp}，保留收集器\ascii{result}即可。
+
+此时，既有的测试夹具也被一并删除，毕竟此处只有一个测试用例存在。之前，建立测试夹具是为了消除两个测试用例之间的重复实现；现在，删除测试夹具是因为原来的两个测试用例已经被删除，它也没有继续存在的理由。由此可以看出，重构是很自然的过程，应该成为日常的一个习惯。
+
+\begin{nodiff}{test/mars/core/WasRunSpec.cc}
+\begin{c++}
+#include <gtest/gtest.h>
+#include <mars/core/TestMethod.h>
+
+namespace {
+  std::string result;
+
+  struct WasRun {
+    void setUp() {
+      result += "[setUp]";
+    }
+
+    void testMethod() {
+      result += "[runTest]";
+    }
+  };
+}
+
+TEST(WasRunSpec, should_setup_before_running_test) {
+  TestMethod<WasRun> test(&WasRun::testMethod);
+  test.run();
+  ASSERT_EQ("[setUp][runTest]", result);
+}
+\end{c++}
+\end{nodiff}
+
+% \subsection{测试用例}
+
+% \begin{diff}{test/mars/core/TestCaseSpec.cc}
+%  \begin{minicpp}
+% #include <gtest/gtest.h>
+% #include "mars/core/TestCase.h"
+
+% namespace {
+%   struct SimpleTest : TestCase {
+%     bool wasRun = false;
+
+%   private:
+%     void run() override {
+%       wasRun = true;
+%     }
+%   };
+
+%   void run(TestCase& test) {
+%     test.run();
+%   }
+% }
+
+% TEST(SimpleTest, make_sure_test_case_can_run_normally) {
+%   SimpleTest test;
+%   run(test);
+
+%   ASSERT_TRUE(test.wasRun);
+% }
+%  \end{minicpp}
+% \tcblower
+%  \begin{minicpp}
+% #include <gtest/gtest.h>
+% #include "mars/core/TestCase.h"
+
+% namespace {
+%   struct SimpleTest : TestCase {
+%     bool wasSetUp = false;
+%     bool wasRun = false;
+
+%   private:
+%     void setUp() override {
+%       wasSetUp = true;
+%     }
+
+%     void runTest() override {
+%       wasRun = true;
+%     }
+%   };
+% }
+
+% TEST(SimpleTest, make_sure_test_case_can_run_normally) {
+%   SimpleTest test;
+%   test.run();
+
+%   ASSERT_TRUE(test.wasSetUp);
+%   ASSERT_TRUE(test.wasRun);
+% }
+%  \end{minicpp} 
+% \end{diff}
+
+
+% 被覆写的\ascii{SimpleTest::setUp, SimpleTest::runTest}成员函数被显式声明为\ascii{override}与\ascii{private}。前者在编译时完成函数签名的合法性检查，后者限制外部用户使用\ascii{SimpleTest}对象直接调用\ascii{setUp, runTest}成员函数。
+
+% \begin{episode}{private与override}
+% \begin{content}
+
+% \subsubsection{按接口编程}
+
+% 一般地，在面向对象程序设计中，需要遵循“按接口类型编程”的基本设计原则。在\ascii{C++}设计语言中，基类使用虚函数声明抽象函数，子类使用\ascii{override}覆写虚函数。
+
+% 在编译时，编译器按照基类的接口类型确定函数调用关系。而在运行时，根据对象的具体类型在相应的虚表中检索对应的成员函数，完成运行时多态的调用。
+
+% 因此，除非存在特殊的需求，将\ascii{override}函数\ascii{private}化，以明确对外声明：在编译时，无法通过该具体类型实现对\ascii{override}函数的直接调用；推荐使用抽象的基类型，在运行时实现多态调用。
+
+% \subsubsection{例外}
+
+% 凡事都存在例外，被覆写的析构函数就不应该声明为\ascii{private}；否则，无法生成该类型的值对象，因为没办法析构。
+
+% \end{content}
+% \end{episode}
+
+% \subsection{通过编译}
+
+% 重构\ascii{TestCase}，仅公开\ascii{run}方法，并移除运行时多态的特性，它负责组织用例执行运行时的算法骨架。搬迁运行时多态行为至私有的两个虚函数，用户根据自己的场景定制\ascii{setUp}与\ascii{runTest}，分别完成测试准备，及其测试执行。
+
+% \begin{diff}{include/mars/core/TestCase.h}
+%  \begin{minicpp}
+% struct TestCase {
+%   virtual void run() = 0;
+%   virtual ~TestCase() {}
+% }; 
+%  \end{minicpp}
+% \tcblower
+%  \begin{minicpp}
+% struct TestCase {
+%   void run();
+%   virtual ~TestCase() {}
+
+% private:
+%   virtual void setUp() {}
+%   virtual void runTest() {}
+% };
+%  \end{minicpp} 
+% \end{diff}
+
+
+% \begin{episode}{善用快捷键}
+% \begin{content}
+
+% \subsubsection{场景1}
+
+% 在\ascii{C++}编程实践中，需要经常在头文件、实现文件、测试文件中频繁切换；而且头文件声明的成员函数，需要在实现文件中实现。幸运的是，\ascii{Eclipse IDE}提供了相关快捷键，让这些事情变得不再麻烦。
+
+% \begin{enum}
+%   \eitem{\code{Ctrl + Tab}: 在头文件与实现文件之间切换；}
+%   \eitem{\code{Ctrl + E}: 打开最近打开的文件列表；}  
+%   \eitem{\code{Alt + Shift + S}: 实现头文件中声明的函数；}      
+%   \eitem{\code{Ctrl + Shift + N}: 自动导入缺失的头文件。}      
+% \end{enum}
+
+% \subsubsection{场景2}
+
+% “重命名函数”是最常见的一种重构手法，如果严格遵循重构过程，需要每个步骤都谨小慎微。
+
+% \begin{enum}
+%   \eitem{新建一个函数；}
+%   \eitem{拷贝旧函数的实现至新函数；}
+%   \eitem{编译，测试通过；}
+%   \eitem{删除旧函数的实现逻辑，转调新函数；}
+%   \eitem{编译，测试通过；}
+%   \eitem{对于每个引用旧函数的地方，重构引用新函数，确保编译、测试通过；}    
+%   \eitem{删除旧函数。}      
+% \end{enum}
+
+% \ascii{Eclipse IDE}提供了重命名类与函数的快捷键\ascii{Alt + Shift + R}，轻松搞定这件事情。善用快捷键，不仅可以提高编程的效率，也能提高重构的安全性。
+
+% \subsubsection{快捷键}
+
+% 没有必要掌握所有的快捷键，但需要熟悉常用的快捷键。在结对编程实践中，向同伴学习，或推荐同伴，都是一件极其有意思的事情。
+
+% \begin{enum}
+%   \eitem{大杀器}
+% \begin{enum}
+%   \eitem{\code{Ctrl + Shift + L}: 列出所有的快捷键，恢复记忆；}
+% \end{enum}
+
+%   \eitem{导航类}
+% \begin{enum}
+%   \eitem{\code{Ctrl + Shift + R}: 跳转到特定文件，常使用模糊匹配方式搜索文件；}
+%   \eitem{\code{Ctrl + Shift + T}: 跳转至某个符号，例如类，函数，全局变量；}
+%   \eitem{\code{Alt + } $\leftarrow/\rightarrow$: 跳转至上一个/下一个编辑点；} 
+%   \eitem{\code{Ctrl + E}: 在最近打开的文件列表中切换；}
+%   \eitem{\code{Ctrl + O}: 在当前文件中的函数之间切换；}
+%   \eitem{\code{Ctrl + Q}: 跳转到最后编辑过的位置；}  
+%   \eitem{\code{Ctrl + L}: 跳转至特定的行，定位编译错误很有用；}
+%   \eitem{\code{Ctrl + =}: 宏展开；}        
+%   \eitem{\code{Ctrl + T}: 查看继承层次；}
+%   \eitem{\code{Alt + Shift + S}: 代码生成视图；}
+%   \eitem{\code{Alt + Shift + N}: 新建文件视图；}
+% \end{enum}
+
+%   \eitem{光标类}
+% \begin{enum}
+%   \eitem{\code{Ctrl + }$\leftarrow/\rightarrow$: 逐单词向左/向右移动光标；}
+%   \eitem{\code{Shift + }$\leftarrow/\rightarrow$: 逐字符向左/向右选择；}
+%   \eitem{\code{Ctrl + Shift + }$\leftarrow/\rightarrow$: 逐单词向左/向右选择；}
+%   \eitem{\code{Shift + Home/End}: 从当前光标选择至行首/行末；}  
+%   \eitem{\code{Shift + }$\downarrow/\uparrow$: 选择当前行/上一行；}  
+%   \eitem{\code{Ctrl + Shift + }$\downarrow/\uparrow$: 移动光标至下一个/上一个成员；}    
+%   \eitem{\code{Ctrl + A}: 全选；}  
+% \end{enum}
+      
+%   \eitem{编辑类}
+% \begin{enum}
+%   \eitem{\code{Ctrl + D}: 删除当前行；}
+%   \eitem{\code{Alt + }$\uparrow/\downarrow$: 向上/向下移动当前行；}   
+%   \eitem{\code{Ctrl + Alt + }$\uparrow/\downarrow$: 向上/向下复制当前行；}     
+%   \eitem{\code{Ctrl + Shift + F}: 格式化；}
+%   \eitem{\code{Ctrl + Shift + N}: 自动导入缺失的头文件；}  
+%   \eitem{\code{Ctrl + Shift + X/Y}: 转为小写/大写；} 
+%   \eitem{\code{Alt + Shift + A}: 列模式}
+%   \eitem{\code{Alt + Shift + R}: 重命名；}
+%   \eitem{\code{Ctrl + Alt + J}: 合并行；}  
+%   \eitem{\code{Ctrl + Z}: 撤销；}
+%   \eitem{\code{Ctrl + Shift + Z}: 恢复；}      
+% \end{enum}
+
+%   \eitem{功能键}
+% \begin{enum}
+%   \eitem{\code{F2}: 重命名文件名；}
+%   \eitem{\code{F3}: 跳转类、函数定义；}
+%   \eitem{\code{F4}: 查看继承层次；}  
+% \end{enum}
+
+%   \eitem{注释类}
+% \begin{enum}
+%   \eitem{\code{Ctrl + }$/$: 单行注释，或取消单行注释；} 
+%   \eitem{\code{Ctrl + shift +  }$/$: 多行注释；} 
+%   \eitem{\code{Ctrl + shift +  } $\backslash$: 取消多行注释；}   
+% \end{enum}
+
+%   \eitem{查找类}
+% \begin{enum}
+%   \eitem{\code{Ctrl + H}: 打开搜索对话框；} 
+%   \eitem{\code{Ctrl + K}: 在文件内查找下一个该符号的位置；} 
+%   \eitem{\code{Ctrl + Shift + K}: 在文件内查找上一个该符号的位置；}   
+%   \eitem{\code{Ctrl + shift + G}: 查找该符号所有的引用；} 
+%   \eitem{\code{Ctrl + shift + H}: 查看函数的调用关系；}   
+% \end{enum}
+
+% \end{enum}
+
+% \end{content}
+% \end{episode}
+
+% \subsection{通过测试}
+
+% 实现\ascii{TestCase::run}的主体逻辑。
+
+% \begin{nodiff}{include/mars/core/TestCase.h, src/mars/core/TestCase.cc}
+%  \begin{c++}
+% struct TestCase {
+%   void run();
+%   virtual ~TestCase() {}
+
+% private:
+%   virtual void setUp() {}
+%   virtual void runTest() {}
+% };
+%  \end{c++}
+% \tcblower
+%  \begin{c++}
+% #include "mars/core/TestCase.h"
+
+% void TestCase::run() {
+%   setUp();
+%   runTest();
+% }
+%  \end{c++} 
+% \end{nodiff}
+
+% 测试通过。
 
 \end{content}
 
@@ -265,76 +561,88 @@ void TestCase::run() {
 
 \begin{content}
 
-\subsection{测试用例}
+\subsection{清仓查库}
 
-同理，测试执行后使用\ascii{tearDown}完成现场清理，释放资源。用户通过定制私有的虚函数\ascii{tearDown}完成此功能。
+测试执行后使用\ascii{tearDown}完成现场清理，释放资源。重构既有的测试用例使其失败，确定\ascii{tearDown}事件发生的顺序与预期相符。
 
-\newpage
-
-\begin{diff}{test/mars/core/TestCaseSpec.cc}
- \begin{minicpp}
+\begin{nodiff}{test/mars/core/TestCaseSpec.cc}
+ \begin{c++}
+#include <mars/core/TestMethod.h>
 #include <gtest/gtest.h>
-#include "mars/core/TestCase.h"
 
 namespace {
-  struct SimpleTest : TestCase {
-    bool wasSetUp = false;
-    bool wasRun = false;
+  std::string result;
 
-  private:
-    void setUp() override {
-      wasSetUp = true;
+  struct WasRun {
+    void setUp() {
+      result += "[setUp]";
     }
 
-    void runTest() override {
-      wasRun = true;
+    void testMethod() {
+      result += "[runTest]";
+    }
+
+    void tearDown() {
+      result += "[tearDown]";
     }
   };
 }
 
-TEST(SimpleTest, make_sure_test_case_can_run_normally) {
-  SimpleTest test;
+TEST(WasRunSpec, full_life_cycle_for_test_case) {
+  TestMethod<WasRun> test(&WasRun::testMethod);
   test.run();
-
-  ASSERT_TRUE(test.wasSetUp);
-  ASSERT_TRUE(test.wasRun);
+  ASSERT_EQ("[setUp][runTest][tearDown]", result);
 }
- \end{minicpp}
+\end{c++}
+\end{nodiff}
+
+\subsubsection{通过测试}
+
+当用例执行完成后，\ascii{TestCase::tearDown}负责清理现场。
+
+\begin{diff}{include/mars/core/TestMethod.h}
+ \begin{minicpp}
+template <typename Fixture>
+struct TestMethod {
+private:
+  using Method = void(Fixture::*)();
+
+public:
+  TestMethod(Method method)
+    : method(method) {}
+
+  void run() {
+    self.setUp();
+    (self.*method)();
+  }
+
+private:
+  Fixture self;
+  Method method;
+};
+  \end{minicpp}
 \tcblower
  \begin{minicpp}
-#include <gtest/gtest.h>
-#include "mars/core/TestCase.h"
+template <typename Fixture>
+struct TestMethod {
+private:
+  using Method = void(Fixture::*)();
 
-namespace {
-  struct SimpleTest : TestCase {
-    bool wasSetUp = false;
-    bool wasRun = false;
-    bool wasTearDown = false;
+public:
+  TestMethod(Method method)
+    : method(method) {}
 
-  private:
-    void setUp() override {
-      wasSetUp = true;
-    }
+  void run() {
+    self.setUp();
+    (self.*method)();
+    self.tearDown();
+  }
 
-    void runTest() override {
-      wasRun = true;
-    }
-
-    void tearDown() override {
-      wasTearDown = true;
-    }
-  };
-}
-
-TEST(SimpleTest, make_sure_test_case_can_run_normally) {
-  SimpleTest test;
-  test.run();
-
-  ASSERT_TRUE(test.wasSetUp);
-  ASSERT_TRUE(test.wasRun);
-  ASSERT_TRUE(test.wasTearDown);  
-}
- \end{minicpp} 
+private:
+  Fixture self;
+  Method method;
+};
+  \end{minicpp}
 \end{diff}
 
 \begin{episode}{struct与class}
@@ -484,25 +792,25 @@ private:
 \end{content}
 \end{episode}
 
-\subsection{通过编译}
+\subsection{连理分枝}
 
-当用例执行完成后，\ascii{TestCase::tearDown}负责清理现场。
+至此用例运行时的主干逻辑已然形成，即使缺乏异常处理机制。但是，\ascii{TestMethod}携带复杂的模板参数，使用起来极为不便。仔细推敲，\ascii{TestMethod::run}逻辑由三个基本逻辑组成，可以稳定地抽取出来。
 
-\begin{diff}{include/mars/core/TestCase.h}
+\begin{enum}
+  \eitem{准备资源: \code{setUp};}
+  \eitem{执行测试: \code{runTest};}
+  \eitem{释放资源: \code{tearDown}。}
+\end{enum}
+
+\subsubsection{提取算法}
+
+\ascii{TestCase::run}实现了\ascii{xUnit}最核心的高层算法逻辑，实现了高层算法逻辑与底层实现细节的解耦，并且实现了高层算法逻辑的高度复用。
+
+\begin{diff}{include/mars/core/TestCase.h, src/mars/core/TestCase.cc}
  \begin{minicpp}
 struct TestCase {
   void run();
-  virtual ~TestCase() {}
 
-private:
-  virtual void setUp() {}
-  virtual void runTest() {}
-};
-  \end{minicpp}
-\tcblower
- \begin{minicpp}
-struct TestCase {
-  void run();
   virtual ~TestCase() {}
 
 private:
@@ -511,24 +819,9 @@ private:
   virtual void tearDown() {}
 };
   \end{minicpp}
-\end{diff}
-
-\subsection{通过测试}
-
-至此，完成了运行一个用例的主干逻辑，但缺乏异常处理机制，留待后续处理。
-
-\begin{diff}{src/mars/core/TestCase.cc}
- \begin{minicpp}
-#include "mars/core/TestCase.h"
-
-void TestCase::run() {
-  setUp();
-  runTest();
-}
-  \end{minicpp}
 \tcblower
  \begin{minicpp}
-#include "mars/core/TestCase.h"
+#include <mars/core/TestCase.h>
 
 void TestCase::run() {
   setUp();
@@ -538,7 +831,9 @@ void TestCase::run() {
   \end{minicpp}
 \end{diff}
 
-\ascii{TestCase::run}实现了\ascii{xUnit}最核心的高层算法逻辑，实现了高层算法逻辑与底层实现细节的解耦，并且实现了高层算法逻辑的高度复用。如\refig{simple-test}所示。
+\subsubsection{扩展方法}
+
+如\refig{simple-test}所示，扩展\ascii{TestCase}只需重写算法子步骤的具体逻辑。例如，\ascii{WasRun}的测试用例，扩展实现\ascii{TestCase}的方法如下代码所示。
 
 \begin{figure}[H]
 \centering
@@ -547,7 +842,405 @@ void TestCase::run() {
  \label{fig:simple-test}
 \end{figure}
 
-\subsection{引入策略}
+\begin{nodiff}{test/mars/core/WasRunSpec.cc}
+ \begin{c++}
+#include "mars/core/TestCase.h"
+#include <gtest/gtest.h>
+
+namespace {
+  struct WasRun : TestCase {
+    bool wasRun = false;
+
+  private:
+    void run() override {
+      wasRun = true;
+    }
+  };
+}
+
+TEST(WasRunSpec, make_sure_test_method_be_ran) {
+  WasRun test;
+  test.run();
+  ASSERT_TRUE(test.wasRun);
+}
+  \end{c++}
+\end{nodiff}
+
+\subsubsection{接口适配}
+
+通过重构，\ascii{TestMethod}成为\ascii{TestCase}的一种实现方法，它基于某个测试方法(其类型为\code{void(Fixture::*)()})实现。\ascii{TestCase::run}抽取了用例运行时完整的生命周期，相对较为稳定。
+
+\begin{diff}{include/mars/core/TestMethod.h}
+ \begin{minicpp}
+template <typename Fixture>
+struct TestMethod {
+private:
+  using Method = void(Fixture::*)();
+
+public:
+  TestMethod(Method method)
+    : method(method) {}
+
+  void run() {
+    self.setUp();
+    (self.*method)();
+    self.tearDown();
+  }
+
+private:
+  Fixture self;
+  Method method;
+};
+  \end{minicpp}
+\tcblower
+ \begin{minicpp}
+#include <mars/core/TestCase.h>
+
+template <typename Fixture>
+struct TestMethod : TestCase {
+private:
+  using Method = void(Fixture::*)();
+
+public:
+  TestMethod(Method method)
+    : method(method) {}
+
+private:
+  void setUp() override {
+    self.setUp();
+  }
+
+  void runTest() override {
+    (self.*method)();
+  }
+
+  void tearDown() override {
+    self.tearDown();
+  }
+
+private:
+  Fixture self;
+  Method method;
+};
+  \end{minicpp}
+\end{diff}
+
+如\refig{testcase-adapter}所示，\ascii{TestMethod}包装了测试方法\code{void(Fixture::*)()}的调用逻辑，且实现了\ascii{TestCase}的具体算法细节。以\ascii{TestMethod}为媒介，任意一个测试方法，都可以适配成为\ascii{TestCase}的一个实例，完美完成\emph{测试方法}到\emph{测试用例}的华丽脱变，这也是\ascii{xUnit Mars}最关键的抽象和设计了。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.4\textwidth]{figures/xunit/testcase-adapter.png}
+\caption{适配器与包装器}
+ \label{fig:testcase-adapter}
+\end{figure}
+
+经过重构，将\ascii{TestMethod}最为稳定的部分已被抽取到\ascii{TestCase}之中，而\ascii{TestCase}是一个普通类，无任何泛型信息，极大地缩小了编译时依赖。\ascii{TestMethod}作为\ascii{TestCase}的实现之一，相对更加稳定和抽象。以后，将不在基于具体的\ascii{TestMethod}讨论问题，而基于抽象的\ascii{TestCase}思考问题。
+
+\end{content}
+
+\section{陷阱}
+
+\begin{content}
+
+存在一个陷阱，模拟失败的测试用例。
+
+\begin{nodiff}{test/mars/core/WasSuccSpec.cc}
+\begin{c++}
+#include <mars/core/TestMethod.h>
+#include <gtest/gtest.h>
+
+namespace {
+  bool wasSucc = false;
+
+  struct WasSucc {
+    void testMethod() {
+      wasSucc = true;
+    }
+  };
+}
+
+TEST(WasSuccSpec, make_sure_test_method_be_succ) {
+  TestMethod<WasSucc> test(&WasSucc::testMethod);
+  test.run();
+  ASSERT_TRUE(wasSucc);
+}
+\end{c++}
+\end{nodiff}
+
+\subsection{亡羊补牢}
+
+此时编译失败，因为\ascii{TestMethod}要求\ascii{WasSucc}存在公开的\ascii{setUp, tearDown}成员函数。为了修复失败的测试用例，手动给\ascii{WasSucc}添加公开的\ascii{setUp, tearDown}成员函数，且默认实现为空。
+
+\begin{nodiff}{test/mars/core/WasSuccSpec.cc}
+\begin{c++}
+#include <mars/core/TestMethod.h>
+#include <gtest/gtest.h>
+
+namespace {
+  bool wasSucc = false;
+
+  struct WasSucc {
+    void setUp() {
+    }
+
+    void testMethod() {
+      wasSucc = true;
+    }
+
+    void tearDown() {
+    }
+  };
+}
+
+TEST(WasSuccSpec, make_sure_test_running_be_succ) {
+  TestMethod<WasSucc> test(&WasSucc::testMethod);
+  test.run();
+  ASSERT_TRUE(wasSucc);
+}
+\end{c++}
+\end{nodiff}
+
+显然，默认实现\ascii{setUp, tearDown}具有普遍性。每次逼迫用户写一遍空实现的\ascii{setUp, tearDown}，必然造成客户代码的大量重复设计。
+
+\subsection{消除重复}
+
+为了消除重复，提取抽象\ascii{TestFixture}，其包含了\ascii{setUp, tearDown}的默认空实现。
+
+\begin{nodiff}{include/mars/core/TestFixture.h}
+\begin{c++}
+struct TestFixture {
+  virtual void setUp() {}
+  virtual void tearDown() {}
+  
+  virtual ~TestFixture() {}
+};
+\end{c++}
+\end{nodiff}
+
+应用\ascii{TestFixture}，消除了\ascii{WasSucc}的空实现。
+
+\begin{diff}{test/mars/core/WasSuccSpec.cc}
+\begin{minicpp}
+#include <mars/core/TestMethod.h>
+#include <gtest/gtest.h>
+
+namespace {
+  bool wasSucc = false;
+
+  struct WasSucc {
+    void setUp() {
+    }
+
+    void testMethod() {
+      wasSucc = true;
+    }
+
+    void tearDown() {
+    }
+  };
+}
+
+TEST(WasSuccSpec, make_sure_test_running_is_succ) {
+  TestMethod<WasSucc> test(&WasSucc::testMethod);
+  test.run();
+  ASSERT_TRUE(wasSucc);
+}
+\end{minicpp}
+\tcblower
+\begin{minicpp}
+#include <mars/core/TestMethod.h>
+#include <mars/core/TestFixture.h>
+#include <gtest/gtest.h>
+
+namespace {
+  bool wasSucc = false;
+
+  struct WasSucc : TestFixture {
+    void testMethod() {
+      wasSucc = true;
+    }
+  };
+}
+
+TEST(WasSuccSpec, make_sure_test_running_is_succ) {
+  TestMethod<WasSucc> test(&WasSucc::testMethod);
+  test.run();
+  ASSERT_TRUE(wasSucc);
+}
+\end{minicpp}
+\end{diff}
+
+同理，测试用例\ascii{WasRun}也可以注入\ascii{TestFixture}。此时，使用\ascii{override}可以增强编译时的安全性。
+
+\begin{diff}{test/mars/core/WasRunSpec.cc}
+\begin{minicpp}
+#include <mars/core/TestMethod.h>
+#include <gtest/gtest.h>
+
+namespace {
+  std::string result;
+
+  struct WasRun {
+    void setUp() {
+      result += "[setUp]";
+    }
+
+    void testMethod() {
+      result += "[runTest]";
+    }
+
+    void tearDown() {
+      result += "[tearDown]";
+    }
+  };
+}
+
+TEST(WasRunSpec, full_life_cycle_for_test_case) {
+  TestMethod<WasRun> test(&WasRun::testMethod);
+  test.run();
+  ASSERT_EQ("[setUp][runTest][tearDown]", result);
+}
+\end{minicpp}
+\tcblower
+\begin{minicpp}
+#include <mars/core/TestMethod.h>
+#include <mars/core/TestFixture.h>
+#include <gtest/gtest.h>
+
+namespace {
+  std::string result;
+
+  struct WasRun : TestFixture {
+    void setUp() override {
+      result += "[setUp]";
+    }
+
+    void testMethod() {
+      result += "[runTest]";
+    }
+
+    void tearDown() override {
+      result += "[tearDown]";
+    }
+  };
+}
+
+TEST(WasRunSpec, full_life_cycle_for_test_case) {
+  TestMethod<WasRun> test(&WasRun::testMethod);
+  test.run();
+  ASSERT_EQ("[setUp][runTest][tearDown]", result);
+}
+\end{minicpp}
+\end{diff}
+
+\subsection{私生子}
+
+得益于\ascii{TestFixture}的抽象，\ascii{TestCase}也获得了代码复用的机会，进一步消除重复逻辑。此处使用私有继承，并非公有继承，因为\ascii{setUp, tearDown}只是\ascii{TeseCase::run}的一个具体实现细节。
+
+\begin{diff}{include/mars/core/TestCase.h}
+ \begin{minicpp}
+struct TestCase {
+  void run();
+
+  virtual ~TestCase() {}
+
+private:
+  virtual void setUp() {}
+  virtual void runTest() {}
+  virtual void tearDown() {}
+};
+  \end{minicpp}
+\tcblower
+ \begin{minicpp}
+#include <mars/core/TestFixture.h>
+
+struct TestCase : private TestFixture {
+  void run();
+
+private:
+  virtual void runTest() {}
+};
+  \end{minicpp}
+\end{diff}
+
+\subsection{动而若静}
+
+抽象的\ascii{TestFixture}，具有运行时多态的特性，可注入到\ascii{TestCase}之中。但是当被注入到\ascii{WasSucc}之中，被\ascii{TestMethod}按照''鸭子编程''的方式被静态调用。如果用户需要重写\ascii{setUp, tearDown}，用户则不得不公开实现。
+
+仔细推敲，\ascii{TestMethod}中直接基于模板参数\ascii{Fixture}进行编程，违反了''按照接口编程''的\ascii{OO}设计原则。因此，在\ascii{TestMethod}中增加\code{TestFixture& fixture = self}类内初始化语句，使得调用\ascii{setUp, tearDown}时基于抽象的\ascii{TestFixture}接口类型实现运行时多态。而\code{(self.*method)()}则使用具体的子类型实现编译时多态。动静相辅、协同工作的方法，充分体现了\ascii{C++}无以伦比的设计美感，其他程序设计语言只能望尘莫及。
+
+\begin{nodiff}{include/mars/core/TestMethod.h}
+ \begin{c++}
+#include <mars/core/TestCase.h>
+
+template <typename Fixture>
+struct TestMethod : TestCase {
+private:
+  using Method = void(Fixture::*)();
+
+public:
+  TestMethod(Method method)
+    : method(method) {}
+
+private:
+  void setUp() override {
+    fixture.setUp();
+  }
+
+  void runTest() override {
+    (self.*method)();
+  }
+  void tearDown() override {
+    fixture.tearDown();
+  }
+
+private:
+  Fixture self;
+  Method method;
+  TestFixture& fixture = self;
+};
+  \end{c++}
+\end{nodiff}
+
+得益于\ascii{TestMethod}动而若静的优秀特性，重写\ascii{WasRun}的\ascii{setUp, tearDown}此时可以被声明为\ascii{private}，不必像之前被强约束必须声明为\ascii{public}。
+
+\begin{nodiff}{test/mars/core/WasRunSpec.h}
+ \begin{c++}
+#include <mars/core/TestMethod.h>
+#include <gtest/gtest.h>
+
+namespace {
+  std::string result;
+
+  struct WasRun : TestFixture {
+    void testMethod() {
+      result += "[runTest]";
+    }
+
+  private:
+    void setUp() override {
+      result += "[setUp]";
+    }
+
+    void tearDown() override {
+      result += "[tearDown]";
+    }
+  };
+}
+
+TEST(WasRunSpec, full_life_cycle_for_test_case) {
+  TestMethod<WasRun> test(&WasRun::testMethod);
+  test.run();
+  ASSERT_EQ("[setUp][runTest][tearDown]", result);
+}
+  \end{c++}
+\end{nodiff}
+
+\end{content}
+
+\section{策略}
+
+\begin{content}
 
 模板方法模式与策略模式都可以用来分离高层的算法与具体的实现细节。之前已经看到了模板方法的实现，接下来探讨策略模式实现的效果，并从中对比两者之间的差异，从而指导设计的权衡与取舍。
 

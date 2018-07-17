@@ -227,12 +227,34 @@ TEST(WasRunSpec, make_sure_test_method_be_ran) {
 
 \subsubsection{通过测试}
 
-不幸的是，\ascii{run}函数依赖于具体类型\ascii{WasRun}，而\ascii{WarRun}存在于匿名命名空间内。我们不期望将\ascii{WasRun}搬迁至产品实现中，毕竟\ascii{WarRun}是一个用户自定义的\ascii{xUnit Mars}风格的测试用例。
+不幸的是，\ascii{run}函数依赖于具体类型\ascii{WasRun}，而\ascii{WarRun}存在于匿名命名空间内。我们不期望将\ascii{WasRun}搬迁至产品实现中，毕竟\ascii{WarRun}是一个用户自定义的测试用例。
 
-在不破坏匿名命名空间的封装性，且不将测试代码搬迁至产品代码的前提之下，为了快速通过测试用例，姑且就近实现\ascii{run}函数。
+在不破坏匿名命名空间的封装性，且不将测试代码污染产品代码的前提之下，为了快速通过测试用例，姑且就近实现\ascii{run}函数。
 
-\begin{nodiff}{test/mars/core/WasRunSpec.cc}
-\begin{c++}
+\begin{diff}{test/mars/core/WasRunSpec.cc}
+\begin{minicpp}
+#include <gtest/gtest.h>
+
+namespace {
+  struct WasRun {
+    bool wasRun = false;
+
+    void testMethod() {
+      wasRun = true;
+    }
+  };
+}
+
+TEST(WasRunSpec, make_sure_test_method_be_ran) {
+  WasRun test;
+
+  ASSERT_FALSE(test.wasRun);
+  run(test, &WasRun::testMethod);
+  ASSERT_TRUE(test.wasRun);
+}
+\end{minicpp}
+\tcblower
+\begin{minicpp}
 #include <gtest/gtest.h>
 
 namespace {
@@ -256,8 +278,8 @@ TEST(WasRunSpec, make_sure_test_method_be_ran) {
   run(test, &WasRun::testMethod);
   ASSERT_TRUE(test.wasRun);
 }
-\end{c++}
-\end{nodiff}
+\end{minicpp}
+\end{diff}
 
 \subsubsection{执行测试}
 
@@ -457,46 +479,36 @@ void run(Fixture& self, void(Fixture::*method)()) {
 \end{c++}
 \end{nodiff}
 
-\begin{episode}{头文件保护宏}
+以\ascii{WasRunSpec.cc}为例，使用泛化的\ascii{run}函数，替代特化的\ascii{run}函数。同理，\ascii{WasSuccSpec.cc}使用相同的重构方法应用泛化的\ascii{run}函数，最终消除了两者之间的重复设计，并驱动出产品的初始代码。
 
-\begin{content}
+\begin{diff}{test/mars/core/WasRunSpec.cc}
+\begin{minicpp}
+#include <gtest/gtest.h>
 
-\ascii{C/C++}编译模型通过使用\ascii{include}语句导入头文件而实现的。为了避免头文件被导入多次，每一个头文件都应该定义独一无二的头文件保护宏。社区存在两种典型的代码风格：
+namespace {
+  struct WasRun {
+    bool wasRun = false;
 
-\begin{enum}
-  \eitem{\code{INCL\_<PROJECT>\_<MODULE>\_<FILE>\_H}}
-  \eitem{\code{UUID}}
-\end{enum}
+    void testMethod() {
+      wasRun = true;
+    }
+  };
 
-第一种命名风格问题在于：当头文件被重命名或移动目录时，为了保持一致性需要同步修改头文件保护宏，而此特性\ascii{IDE}通常支持都不是太良好。因此，推荐随机生成\ascii{UUID}，其更加快捷、简单、并且安全、有效。
+  void run(WasRun& self, void(WasRun::*method)()) {
+    (self.*method)();
+  }
+}
 
-首先，配置\ascii{Eclipse CDT}的代码模板。当创建头文件时，自动生成头文件保护宏。
+TEST(WasRunSpec, make_sure_test_method_be_ran) {
+  WasRun test;
+  ASSERT_FALSE(test.wasRun);
 
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.95\textwidth]{figures/xunit/eclipse-code-template.png}
-\caption{Eclipse CDT: 代码模板}
- \label{fig:eclipse-code-template}
-\end{figure}
-
-然后，配置头文件保护宏使用\ascii{UUID}自动生成。
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.95\textwidth]{figures/xunit/eclipse-include-guard.png}
-\caption{Eclipse CDT: 生成UUID的头文件保护宏}
- \label{fig:eclipse-include-guard}
-\end{figure}
-
-为了缩短篇幅，后文略去所有头文件保护符。
-
-\end{content}
-\end{episode}
-
-以\ascii{WasRunSpec.cc}为例，使用泛化的\ascii{run}函数，替代特化的\ascii{run}函数，其效果如下所示。同理，\ascii{WasSuccSpec.cc}使用相同的重构方法应用泛化的\ascii{run}函数，最终消除了两者之间的重复设计，并驱动出产品的初始代码。
-
-\begin{nodiff}{test/mars/core/WasRunSpec.cc}
-\begin{c++}
+  run(test, &WasRun::testMethod);
+  ASSERT_TRUE(test.wasRun);
+}
+\end{minicpp}
+\tcblower
+\begin{minicpp}
 #include <mars/core/TestMethod.h>
 #include <gtest/gtest.h>
 
@@ -517,8 +529,75 @@ TEST(WasRunSpec, make_sure_test_method_be_ran) {
   run(test, &WasRun::testMethod);
   ASSERT_TRUE(test.wasRun);
 }
+\end{minicpp}
+\end{diff}
+
+\begin{episode}{当务之急}
+\begin{content}
+
+\emph{实践\ascii{TDD}，尽快变绿是当务之急}。我常习惯于在测试用例上方的匿名命名空间内，就近直接实现产品代码。如此加快通过测试用例的速度，及其避免在实现与测试之间来回跳转而分散注意力。\ascii{C/C++}语言相对其他语言，相对多了一个头文件，在头文件、实现文件与测试文件之间来回跳转，的确讨厌至极。
+
+另外，初始根本无法确定当前实现就是一个良好的设计，可能只是一个简单尝试。搬迁不成熟的设计，后期重构的成本也很大。在测试上方的匿名命名空间内，就近实现完成。当测试通过后，便可以就地重构上几轮直至满意为止，最后搬迁至产品实现。
+
+最终测试通过后，应用重构将实现逐一搬迁至产品代码中。这时需要特别注意重构的习惯，不要立即\emph{剪切}实现，而应该使用\emph{复制}。当关键步骤完成时，都需要运行测试用例；如果测试通过，立即使用\code{git add}缓存修改，保证用例失败时可回溯到最近可工作的状态。直至从测试代码中搬迁完成所有相关实现至产品之中，最后再从测试代码中安全地删除。
+
+这是重构的基本素养，不至于在重构之中慌了手脚，迷失自我。自信也是影响代码质量的关键因素，如果很长时间内未得到测试成功的反馈结果，自信指数自然下跌。相反地，如果每个微小的步骤都是成功的，正反馈必然促进信心指数上涨，使得编程成为一种乐趣，而不至于陷入一味调试的泥潭之中。
+
+如上例所示，需要将特化实现的\ascii{run}实现重构为模板函数。第一步，在产品代码中新建文件\ascii{TestMethod.h}，复制既有的\ascii{run}实现，创建一个新函数\ascii{runX}，并将其重构为模板函数。
+
+\begin{c++}[title={\ttfamily{重构: 搬迁实现}}]
+void run(WasRun& self, void(WasRun::*method)()) {
+  (self.*method)();
+}
+
+template <typename Fixture>
+void runX(Fixture& self, void(Fixture::*method)()) {
+  (self.*method)();
+}
 \end{c++}
-\end{nodiff}
+
+第二步，搜索所有引用\ascii{run}函数的地方，逐一替换为\ascii{runX}。每替换一个，运行一遍测试用例；如果成功，立即执行\ascii{git add}。直至所有引用\ascii{run}的地方替换为\ascii{runX}。最后，再安全地删除既有的\ascii{run}函数。
+
+第三步，运用\ascii{Alt + Shift + R}重命名\ascii{runX}为\ascii{run}，确保通过测试。
+
+\end{content}
+\end{episode}
+
+\begin{episode}{头文件保护宏}
+
+\begin{content}
+
+\ascii{C/C++}编译模型通过使用\ascii{include}语句导入头文件而实现的。为了避免头文件被导入多次，每一个头文件都应该定义独一无二的头文件保护宏。社区存在两种典型的代码风格：
+
+\begin{enum}
+  \eitem{\code{INCL\_<PROJECT>\_<MODULE>\_<FILE>\_H}}
+  \eitem{\code{UUID}}
+\end{enum}
+
+第一种命名风格问题在于：当头文件被重命名或移动目录时，为了保持一致性需要同步修改头文件保护宏，而此特性\ascii{IDE}通常支持都不是太良好。因此，推荐随机生成\ascii{UUID}，其更加快捷、简单、并且安全、有效。
+
+首先，配置\ascii{Eclipse CDT}的代码模板。当创建头文件时，自动生成头文件保护宏。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{figures/xunit/eclipse-code-template.png}
+\caption{Eclipse CDT: 代码模板}
+ \label{fig:eclipse-code-template}
+\end{figure}
+
+然后，配置头文件保护宏使用\ascii{UUID}自动生成。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{figures/xunit/eclipse-include-guard.png}
+\caption{Eclipse CDT: 生成UUID的头文件保护宏}
+ \label{fig:eclipse-include-guard}
+\end{figure}
+
+为了缩短篇幅，后文略去所有头文件保护符。
+
+\end{content}
+\end{episode}
 
 \subsection{自动实例}
 
@@ -570,7 +649,7 @@ TEST(WasRunSpec, make_sure_test_method_be_ran) {
 \end{minicpp}
 \end{diff}
 
-为了能够快速通过测试，泛化的\ascii{run}函数额外承担\emph{测试对象}创建和维护的职责。此处，\ascii{xUnit Mars}执行引擎与客户建立了一个隐式的契约关系：\emph{测试对象必须具有默认构造函数，否则编译失败}。目前，这个契约已经在\ascii{xUnit}社区得到了一致的认可。
+为了能够快速通过测试，泛化的\ascii{run}函数额外承担\emph{测试对象}创建和维护的职责。此处，\ascii{xUnit Mars}执行引擎与客户建立了一个隐式的契约关系：\emph{测试对象必须具有默认构造函数}，否则编译失败。目前，这个契约已经在\ascii{xUnit}社区得到了一致的认可。
 
 \begin{diff}{include/mars/core/TestMethod.h}
 \begin{minicpp}
@@ -589,64 +668,89 @@ void run(void(Fixture::*method)()) {
 \end{minicpp}
 \end{diff}
 
-\subsection{函数对象}
 
-泛型的\ascii{run}函数，它创建和持有\emph{测试对象}，其极大地限制了\emph{测试对象}生命周期的管理。重构既有的测试用例，引入函数对象\ascii{TestMethod}替代模板函数\ascii{run}。
+\subsection{类型别名}
 
-由于篇幅限制，此处未能逐一显示重构的每个细节，需要注意重构的安全步骤。切忌马上替换既有的测试用例，及其\ascii{run}函数的实现。正确的重构步骤，应该先增加新的测试用例，然后再实现函数对象\ascii{TestMethod}，保证通过新的测试用例之后，再删除既有的测试用例，及其\ascii{run}函数。
-
-\begin{diff}{test/mars/core/WasRunSpec.cc}
-\begin{minicpp}
-#include <mars/core/TestMethod.h>
-#include <gtest/gtest.h>
-
-namespace {
-  bool wasRun = false;
-
-  struct WasRun {
-    void testMethod() {
-      wasRun = true;
-    }
-  };
-}
-
-TEST(WasRunSpec, make_sure_test_method_was_ran) {
-  ASSERT_FALSE(wasRun);
-  run(&WasRun::testMethod);
-  ASSERT_TRUE(wasRun);
-}
-\end{minicpp}
-\tcblower
-\begin{minicpp}
-#include <mars/core/TestMethod.h>
-#include <gtest/gtest.h>
-
-namespace {
-  bool wasRun = false;
-
-  struct WasRun {
-    void testMethod() {
-      wasRun = true;
-    }
-  };
-}
-
-TEST(WasRunSpec, make_sure_test_method_was_ran) {
-  TestMethod<WasRun> test(&WasRun::testMethod);
-
-  ASSERT_FALSE(wasRun);
-  test.run();
-  ASSERT_TRUE(wasRun);
-}
-\end{minicpp}
-\end{diff}
-
-为了通过测试，函数对象\ascii{TestMethod}搬迁模板函数\ascii{run}的主干逻辑。
+不幸的是，在\ascii{run}实现中，其参数类型声明为\code{void(Fixture::*method)()}，极其难于理解。一般地，对于指向成员函数的指针，常引入类型别名，提高其表达力。
 
 \begin{diff}{include/mars/core/TestMethod.h}
 \begin{minicpp}
 template <typename Fixture>
 void run(void(Fixture::*method)()) {
+  Fixture self;
+  (self.*method)();
+}
+\end{minicpp}
+\tcblower
+\begin{minicpp}
+template <typename Fixture>
+using TestMethod = void(Fixture::*)();
+
+template <typename Fixture>
+void run(TestMethod<Fixture> method) {
+  Fixture self;
+  (self.*method)();
+}
+\end{minicpp}
+\end{diff}
+
+在测试用例中，两种表达方式效果相同。
+
+\begin{diff}{test/mars/WasSucc.cc}
+\begin{minicpp}
+TEST(TestSuiteSpec, make_sure_test_method_be_ran) {
+  ASSERT_FALSE(wasSucc);
+  run(&WasSucc::testMethod);
+  ASSERT_TRUE(wasSucc);
+}
+\end{minicpp}
+\tcblower
+\begin{minicpp}
+TEST(TestSuiteSpec, make_sure_test_method_be_ran) {
+  auto test = &WasSucc::testMethod;
+
+  ASSERT_FALSE(wasSucc);
+  run(test);
+  ASSERT_TRUE(wasSucc);
+}
+\end{minicpp}
+\end{diff}
+
+\subsection{函数对象}
+
+重构既有的测试用例，使其符合\ascii{OO}的调用风格。
+
+\begin{diff}{test/mars/WasSucc.cc}
+\begin{minicpp}
+TEST(TestSuiteSpec, make_sure_test_method_be_ran) {
+  auto test = &WasSucc::testMethod;
+
+  ASSERT_FALSE(wasSucc);
+  run(test);
+  ASSERT_TRUE(wasSucc);
+}
+\end{minicpp}
+\tcblower
+\begin{minicpp}
+TEST(TestSuiteSpec, make_sure_test_method_be_ran) {
+  TestMethod<WasSucc> test(&WasSucc::testMethod);
+
+  ASSERT_FALSE(wasSucc);
+  test.run();
+  ASSERT_TRUE(wasSucc);
+}
+\end{minicpp}
+\end{diff}
+
+为了通过测试，引入函数对象\ascii{TestMethod}，将\ascii{run}搬迁成为\ascii{TestMethod}的成员函数。此时，\ascii{TestMethod}持有\emph{测试对象}，并负责执行\emph{测试方法}。可以将\ascii{TestMethod}看做\emph{测试方法}的包装器，相对于普通的模板函数\ascii{run}，\ascii{TestMethod}更具设计弹性的空间。
+
+\begin{diff}{include/mars/core/TestMethod.h}
+\begin{minicpp}
+template <typename Fixture>
+using TestMethod = void(Fixture::*)();
+
+template <typename Fixture>
+void run(TestMethod<Fixture> method) {
   Fixture self;
   (self.*method)();
 }
@@ -674,30 +778,28 @@ private:
 \end{minicpp}
 \end{diff}
 
-此时，\ascii{TestMethod}持有\emph{测试对象}，并负责执行\emph{测试方法}。相对于普通函数，\ascii{TestMethod}更具设计弹性的空间，可以维持其状态实施存储、传递与返回函数对象。
+% \begin{episode}{后悔药}
 
-\begin{episode}{后悔药}
+% \begin{content}
 
-\begin{content}
+% 感谢\ascii{Linus}创造了\ascii{Linux}与\ascii{Git}，让全世界的程序员得以享受编程的快乐。\ascii{TDD}精髓之一便是“小”，配合运用\ascii{Git}，简直就是完美，避免不经意的错误而丢失代码。
 
-感谢\ascii{Linus}创造了\ascii{Linux}与\ascii{Git}，让全世界的程序员得以享受编程的快乐。\ascii{TDD}精髓之一便是“小”，配合运用\ascii{Git}，简直就是完美，避免不经意的错误而丢失代码。
+% 养成经常性提交代码至\ascii{Git}库，是一种良好的编程习惯。在\ascii{TDD}的一个迭代循环中，每当编译通过，链接通过，测试通过，关键重构成功，都应立即执行\ascii{git add}。当设计重构至相对合理状态，最后执行\ascii{git commit}入库，完成一次\ascii{TDD}的闭环。
 
-养成经常性提交代码至\ascii{Git}库，是一种良好的编程习惯。在\ascii{TDD}的一个迭代循环中，每当编译通过，链接通过，测试通过，关键重构成功，都应立即执行\ascii{git add}。当设计重构至相对合理状态，最后执行\ascii{git commit}入库，完成一次\ascii{TDD}的闭环。
+% 此外，借助于\ascii{Git}，随时可以吃后悔药。当尝试某种重构设计时，没有达到预期效果，则可以轻松回到上一个稳定状态，重新开始尝试新的努力。以“重命名函数”的重构过程为例，讲述\ascii{Git}的操作。
 
-此外，借助于\ascii{Git}，随时可以吃后悔药。当尝试某种重构设计时，没有达到预期效果，则可以轻松回到上一个稳定状态，重新开始尝试新的努力。以“重命名函数”的重构过程为例，讲述\ascii{Git}的操作。
+% \begin{enum}
+%   \eitem{新建一个函数；}
+%   \eitem{拷贝旧函数的实现至新函数；}
+%   \eitem{确保编译、测试通过，执行\code{git add}；}  
+%   \eitem{删除旧函数的实现逻辑，转调新函数；}
+%   \eitem{确保编译、测试通过，执行\code{git add}；}
+%   \eitem{对于每个引用旧函数的地方，重构引用新函数，确保编译、测试通过，执行\code{git add}；}    
+%   \eitem{删除旧函数，确保编译、测试通过，执行\code{git commit}。}      
+% \end{enum}
 
-\begin{enum}
-  \eitem{新建一个函数；}
-  \eitem{拷贝旧函数的实现至新函数；}
-  \eitem{确保编译、测试通过，执行\code{git add}；}  
-  \eitem{删除旧函数的实现逻辑，转调新函数；}
-  \eitem{确保编译、测试通过，执行\code{git add}；}
-  \eitem{对于每个引用旧函数的地方，重构引用新函数，确保编译、测试通过，执行\code{git add}；}    
-  \eitem{删除旧函数，确保编译、测试通过，执行\code{git commit}。}      
-\end{enum}
-
-\end{content}
-\end{episode}
+% \end{content}
+% \end{episode}
 
 % 需要关注的是，\ascii{TestCase}实现了一个虚拟析构函数。如果不经意地遗忘声明该析构函数为虚拟的\footnote{默认生成的析构函数是公开的、非虚拟的、内联实现的。}，则可能招致运行时不确定的行为发生。
 
