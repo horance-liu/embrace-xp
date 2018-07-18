@@ -212,7 +212,7 @@ FIXTURE(StackSpec) {
 
 \end{content}
 
-\section{系统架构}
+\section{Mars架构}
 	
 \begin{content}
 
@@ -227,12 +227,27 @@ FIXTURE(StackSpec) {
  \label{fig:mars-framework}
 \end{figure}
 
-\begin{episode}{代码风格}
+\begin{episode}{工欲善其事，必先利其器}
 \begin{content}
 
-\emph{团队成员遵循\ascii{XP}基本价值观，致力于优秀的软件设计。}系统中所有的代码看起来就好像是由单独一个值得胜任的人编写的，并遵循一致的、统一的的代码风格。
+\emph{团队成员遵循\ascii{XP}基本价值观，致力于优秀的软件设计。}系统中所有的代码看起来就好像是由单独一个值得胜任的人编写的，并遵循一致的、统一的的代码风格。得益于现代\ascii{IDE}神器，统一团队的代码模板和代码风格，不仅有利于团队遵循一致风格，也利于团队生产效率提升。
 
-可以配置\ascii{Eclipse CDT}代码模板，团队通过导入代码模板，使其得到一致的代码风格。业界存在多种经典的代码风格，团队应该选择并保持其中一种代码风格。
+\ascii{Eclipse CDT}支持代码模板和代码风格的配置、导入、导出，下文依次分别介绍。关于\ascii{Eclipse CDT}详细配置与使用技巧，推荐阅读王博\footnote{\href{https://www.jianshu.com/u/92b7d9879f20}{\ascii{https://www.jianshu.com/u/92b7d9879f20}}}在简书上的三篇博文：\href{https://www.jianshu.com/p/dafcdce1f9cb}{\ascii{Effective Eclipse CDT}}。
+
+\subsubsection{代码模板}
+
+代码模板旨在固化源文件中基本结构。例如，文件头部的版权声明，头文件保护宏，命名空间等，如\refig{eclipse-code-template}所示。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=1.0\textwidth]{figures/xunit/eclipse-code-template.png}
+\caption{代码模板}
+ \label{fig:eclipse-code-template}
+\end{figure}
+
+\subsubsection{代码风格}
+
+业界存在多种经典的代码风格，团队应该选择并保持其中一种代码风格。
 
 \begin{enum}
   \eitem{\code{K\&R}}
@@ -241,7 +256,7 @@ FIXTURE(StackSpec) {
   \eitem{\code{Whitesmiths}}
 \end{enum}
 
-本书使用\ascii{K\&R}的代码风格，但在对齐方面做了细微调整，如\refig{eclipse-formatter}所示。配置完毕之后，便可以充分享受神奇带来的快感。
+本书使用\ascii{K\&R}的代码风格，仅在对齐方面做了略微调整，如\refig{eclipse-formatter}所示。配置完毕之后，当需要排版代码时，使用快捷键\ascii{Ctrl + Shift + F}便可以享受\ascii{Eclipse CDT}神器的威力。
 
 \begin{figure}[H]
 \centering
@@ -250,9 +265,139 @@ FIXTURE(StackSpec) {
  \label{fig:eclipse-formatter}
 \end{figure}
 
-例如，创建头文件时，自动生成\ascii{UUID}的头文件保护宏，彻底抛弃这个遗留问题；当需要排版代码时，使用快捷键\ascii{Ctrl + Shift + F}立马得到漂亮的代码风格。
+\subsubsection{头文件保护宏}
 
-关于\ascii{Eclipse CDT}详细配置与使用技巧，推荐阅读王博\footnote{\href{https://www.jianshu.com/u/92b7d9879f20}{\ascii{https://www.jianshu.com/u/92b7d9879f20}}}在简书上的三篇博文：\href{https://www.jianshu.com/p/dafcdce1f9cb}{\ascii{Effective Eclipse CDT}}。
+\ascii{C/C++}编译模型通过使用\ascii{include}语句导入头文件而实现的。为了避免头文件被导入多次，每一个头文件都应该定义独一无二的头文件保护宏。社区存在两种典型的代码风格：
+
+\begin{enum}
+  \eitem{\code{INCL\_<PROJECT>\_<MODULE>\_<FILE>\_H}}
+  \eitem{\code{UUID}}
+\end{enum}
+
+第一种命名风格问题在于：当头文件被重命名或移动目录时，为了保持一致性需要同步修改头文件保护宏，而此特性\ascii{IDE}通常支持都不是太良好。因此，推荐随机生成\ascii{UUID}，其更加快捷、简单、并且安全、有效。如\refig{eclipse-include-guard}所示。
+
+使用该特性，在创建头文件时，自动生成\ascii{UUID}的头文件保护宏，彻底抛弃这个头疼的遗留问题。由于本书篇幅受限，后文略去所有头文件保护符。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=1.0\textwidth]{figures/xunit/eclipse-include-guard.png}
+\caption{Eclipse CDT: 生成UUID的头文件保护宏}
+ \label{fig:eclipse-include-guard}
+\end{figure}
+
+\subsubsection{多屏显示}
+
+在\cpp{}编程实践中，需要在头文件和实现文件之间频繁切换。同时，在\ascii{TDD}编程实践中，也需要在测试文件与头文件/实现文件之间频繁切换。
+
+得益于现代\ascii{IDE}的丰富特性，推荐多屏显示相关源文件。例如，如\refig{eclipse-multi-editor}所示，使用\ascii{Eclipse CDT}，三屏分别显示相关联的头文件、实现文件，及其测试用例文件。
+
+推荐购置高清，大屏显示器，有效改善编程环境，从而提高工作效率。关闭无关的\ascii{Tab}页，只打开当前相关的文件，最小化外部干扰。一则让\ascii{IDE}运行速度最佳，二则使用诸如\ascii{Ctrl + E}快捷键切换文件时，最小化文件列表长度。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=1.0\textwidth]{figures/xunit/eclipse-multi-editor.png}
+\caption{Eclipse CDT: 多屏显示}
+ \label{fig:eclipse-multi-editor}
+\end{figure}
+
+\subsubsection{快捷键}
+
+强烈推荐使用快捷键的优秀实践，可以成倍地提高编程的效率，也能提高重构的安全性。此处模拟两个编程现场的真实过程。第一个场景，以文件间切换为例。在\ascii{C++}编程实践中，需要经常在头文件、实现文件、测试文件中频繁切换；而且头文件声明的成员函数，需要在实现文件中实现。幸运的是，\ascii{Eclipse IDE}提供了相关快捷键，让这些事情变得不再麻烦。
+
+\begin{enum}
+  \eitem{\code{Ctrl + Tab}: 在头文件与实现文件之间切换；}
+  \eitem{\code{Ctrl + E}: 打开最近打开的文件列表；}  
+  \eitem{\code{Alt + Shift + S}: 实现头文件中声明的函数；}      
+  \eitem{\code{Ctrl + Shift + N}: 自动导入缺失的头文件。}      
+\end{enum}
+
+第二个场景，以“重命名函数”的重构为例。如果严格遵循重构过程，需要每个步骤都谨小慎微。
+
+\begin{enum}
+  \eitem{新建一个函数；}
+  \eitem{拷贝旧函数的实现至新函数；}
+  \eitem{编译，测试通过；}
+  \eitem{删除旧函数的实现逻辑，转调新函数；}
+  \eitem{编译，测试通过；}
+  \eitem{对于每个引用旧函数的地方，重构引用新函数，确保编译、测试通过；}    
+  \eitem{删除旧函数。}      
+\end{enum}
+
+\ascii{Eclipse IDE}提供了重命名类与函数的快捷键\ascii{Alt + Shift + R}，轻松搞定这件事情。
+
+熟悉常用快捷键是非常有必要的，此处罗列在\ascii{Ubuntu}操作系统下常用的快捷键。在结对编程实践中，向同伴学习，或推荐同伴，都是一件极其有意思的事情。
+
+\begin{enum}
+  \eitem{大杀器}
+\begin{enum}
+  \eitem{\code{Ctrl + Shift + L}: 列出所有的快捷键，恢复记忆；}
+\end{enum}
+
+  \eitem{导航类}
+\begin{enum}
+  \eitem{\code{Ctrl + Shift + R}: 跳转到特定文件，常使用模糊匹配方式搜索文件；}
+  \eitem{\code{Ctrl + Shift + T}: 跳转至某个符号，例如类，函数，全局变量；}
+  \eitem{\code{Alt + } $\leftarrow/\rightarrow$: 跳转至上一个/下一个编辑点；} 
+  \eitem{\code{Ctrl + E}: 在最近打开的文件列表中切换；}
+  \eitem{\code{Ctrl + O}: 在当前文件中的函数之间切换；}
+  \eitem{\code{Ctrl + Q}: 跳转到最后编辑过的位置；}  
+  \eitem{\code{Ctrl + L}: 跳转至特定的行，定位编译错误很有用；}
+  \eitem{\code{Ctrl + =}: 宏展开；}        
+  \eitem{\code{Ctrl + T}: 查看继承层次；}
+  \eitem{\code{Alt + Shift + S}: 代码生成视图；}
+  \eitem{\code{Alt + Shift + N}: 新建文件视图；}
+\end{enum}
+
+  \eitem{光标类}
+\begin{enum}
+  \eitem{\code{Ctrl + }$\leftarrow/\rightarrow$: 逐单词向左/向右移动光标；}
+  \eitem{\code{Shift + }$\leftarrow/\rightarrow$: 逐字符向左/向右选择；}
+  \eitem{\code{Ctrl + Shift + }$\leftarrow/\rightarrow$: 逐单词向左/向右选择；}
+  \eitem{\code{Shift + Home/End}: 从当前光标选择至行首/行末；}  
+  \eitem{\code{Shift + }$\downarrow/\uparrow$: 选择当前行/上一行；}  
+  \eitem{\code{Ctrl + Shift + }$\downarrow/\uparrow$: 移动光标至下一个/上一个成员；}    
+  \eitem{\code{Ctrl + A}: 全选；}  
+\end{enum}
+      
+  \eitem{编辑类}
+\begin{enum}
+  \eitem{\code{Ctrl + D}: 删除当前行；}
+  \eitem{\code{Alt + }$\uparrow/\downarrow$: 向上/向下移动当前行；}   
+  \eitem{\code{Ctrl + Alt + }$\uparrow/\downarrow$: 向上/向下复制当前行；}     
+  \eitem{\code{Ctrl + Shift + F}: 格式化；}
+  \eitem{\code{Ctrl + Shift + N}: 自动导入缺失的头文件；}  
+  \eitem{\code{Ctrl + Shift + X/Y}: 转为小写/大写；} 
+  \eitem{\code{Alt + Shift + A}: 列模式}
+  \eitem{\code{Alt + Shift + R}: 重命名；}
+  \eitem{\code{Ctrl + Alt + J}: 合并行；}  
+  \eitem{\code{Ctrl + Z}: 撤销；}
+  \eitem{\code{Ctrl + Shift + Z}: 恢复；}      
+\end{enum}
+
+  \eitem{功能键}
+\begin{enum}
+  \eitem{\code{F2}: 重命名文件名；}
+  \eitem{\code{F3}: 跳转类、函数定义；}
+  \eitem{\code{F4}: 查看继承层次；}  
+\end{enum}
+
+  \eitem{注释类}
+\begin{enum}
+  \eitem{\code{Ctrl + }$/$: 单行注释，或取消单行注释；} 
+  \eitem{\code{Ctrl + shift +  }$/$: 多行注释；} 
+  \eitem{\code{Ctrl + shift +  } $\backslash$: 取消多行注释；}   
+\end{enum}
+
+  \eitem{查找类}
+\begin{enum}
+  \eitem{\code{Ctrl + H}: 打开搜索对话框；} 
+  \eitem{\code{Ctrl + K}: 在文件内查找下一个该符号的位置；} 
+  \eitem{\code{Ctrl + Shift + K}: 在文件内查找上一个该符号的位置；}   
+  \eitem{\code{Ctrl + shift + G}: 查找该符号所有的引用；} 
+  \eitem{\code{Ctrl + shift + H}: 查看函数的调用关系；}   
+\end{enum}
+
+\end{enum}
 
 \end{content}
 \end{episode}

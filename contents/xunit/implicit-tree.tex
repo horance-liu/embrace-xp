@@ -8,6 +8,8 @@
 
 \begin{content}
 
+本章重点讨论用例组织的实现方式。通过引入\emph{树结构}，提供了一种处理相似逻辑的一般性方法，极大地简化了客户组织用例与运行用例的代码逻辑。最后，为了区分每个测试用例，为其增加命名机制。
+
 \end{content}
 
 \section{测试套件}
@@ -16,15 +18,15 @@
 
 如果每个用例都需要手动地执行\ascii{run}，显得极其笨拙。可以将一堆测试用例打包，用一个简单的\ascii{for}循环依次执行每个用例。
 
-\subsection{测试用例}
+\subsection{什袭以藏}
 
-为了确定每个\ascii{TestCase}都被执行，可以简单定制一个计数器\ascii{num}。用例执行后，断言已运行用例的数目。
+新建一个失败的测试用例，用于打包普通的\ascii{TestCase}实例。为了确定有多少个\ascii{TestCase}被执行，可以定制一个计数器\ascii{num}。当执行完之后，断言已运行用例的数目是否符合预期。
 
 \begin{nodiff}{test/mars/core/TestSuiteSpec.cc}
  \begin{c++}
+#include <mars/core/TestSuite.h>
+#include <mars/core/TestCase.h>
 #include <gtest/gtest.h>
-#include "mars/core/TestCase.h"
-#include "mars/core/TestSuite.h"
 
 namespace {
   int num = 0;
@@ -37,7 +39,7 @@ namespace {
   };
 }
 
-TEST(TestSuite, pack_test_cases_into_test_suite) {
+TEST(TestSuite, pack_multi_test_cases_into_test_suite) {
   TestSuite suite;
   suite.add(new FooTest);
   suite.add(new FooTest);
@@ -49,9 +51,9 @@ TEST(TestSuite, pack_test_cases_into_test_suite) {
  \end{c++}
 \end{nodiff}
 
-\subsection{通过编译}
+\subsubsection{通过编译}
 
-为了快速通过编译，创建\ascii{TestSuite}的头文件。需要注意的是，\ascii{TestSuite}仅对\ascii{TestCase}的指针类型产生依赖，前置声明\ascii{struct TestCase}即可。但是，\ascii{TestSuite}对值对象\ascii{std::vector}则表现为强依赖，因此需要包含头文件。
+为了快速通过编译，创建\ascii{TestSuite}的头文件。需要注意的是，\ascii{TestSuite}仅对\ascii{TestCase}的指针类型产生依赖，前置声明\ascii{struct TestCase}即可。但是，\ascii{TestSuite}对\ascii{std::vector}则表现为强依赖，因此需要包含头文件。
 
 \begin{nodiff}{include/mars/core/TestSuite.h}
  \begin{c++}
@@ -75,7 +77,9 @@ private:
 
 当头文件中仅对类的声明产生依赖，那么前置声明是一种有效降低编译时依赖的重要技术。相反，头文件包含了本不应该包含的头文件，其编译时依赖将被间接污染到其他文件中，重编译将成为大概率事件。
 
-在包含头文件还是前置声明抉择中，其依据的规则其实非常简单。在如下场景前置声明即可，无需包含头文件。
+\subsubsection{前置声明}
+
+在包含头文件还是前置声明抉择中，其依据的规则非常简单。在如下场景前置声明即可，无需包含头文件。
 
 \begin{enum}
   \eitem{\ascii{指针}}
@@ -83,6 +87,8 @@ private:
   \eitem{\ascii{返回值}}
   \eitem{\ascii{函数参数}}
 \end{enum}
+
+\subsubsection{包含头文件}
 
 但是，如果编译器需要知道实体的确切内容，包括类的大小、布局、值等强编译时依赖信息，则必须包含头文件。强编译时依赖包括如下几种场景。
 
@@ -97,18 +103,46 @@ private:
   \eitem{\ascii{typedef/using}类型别名}
 \end{enum}
 
-\end{content}
+\subsubsection{样例}
 
+以验证\ascii{TestCase.h}的自满足性为例。从上到下，从左到右，模拟编译期的行为判定编译时依赖的名字。因为继承于\ascii{TestFixture, Test}，继承是一种编译时强依赖，必须包含相应的头文件。
+
+接着，其构造函数依赖于\code{std::string}，它来自标准库\footnote{\code{std::string}并非普通的类，它实际是\code{basci\_string}的一个别名：\code{using string = basic\_string<char>;} 一般地，当依赖于标准库的名字，基本需要包含头文件，而非前置声明。}，本来需要包含\ascii{std::string}的头文件。但是，考虑到覆写的\ascii{getName}返回值也依赖于\code{std:string}。可以推断，\ascii{TestCase}的某个基类肯定已经包含了\code{std::string}的头文件；否则，该基类的头文件不能自满足，需要优先处理。
+
+最后，再此分析\ascii{TestResult}的依赖关系，本来需要前置声明\ascii{TestResult}。但是，\ascii{run}成员函数也被覆写了。可以推断，\ascii{TestCase}的某个基类肯定已经前置声明\ascii{TestResult}了，\ascii{TestCase}就不用再多此一举，再重复声明一次了。
+
+如上分析，\ascii{TestCase.h}只需包含\ascii{Test.h, TestFixture.h}的头文件，便能够自满足了。
+
+\begin{c++}[title={\ttfamily{验证头文件的自满足性: include/mars/core/TestCase.h}}]
+#include <mars/core/Test.h>
+#include <mars/core/TestFixture.h>
+
+struct TestCase : private TestFixture, Test {
+  explicit TestCase(const std::string &name="");
+    
+private:
+  void run(TestResult &result) override;
+  std::string getName() const override;
+
+private:
+  virtual void runTest() {}
+    
+private:
+  const std::string name;
+};
+\end{c++}
+
+\end{content}
 \end{episode}
 
-\subsection{通过测试}
+\subsubsection{通过测试}
 
 为了通过测试，可以快速实现\ascii{TestSuite::run}的逻辑。
 
 \begin{nodiff}{src/mars/core/TestSuite.cc}
  \begin{c++}
-#include "mars/core/TestSuite.h"
-#include "mars/core/TestCase.h"
+#include <mars/core/TestSuite.h>
+#include <mars/core/TestCase.h>
 
 void TestSuite::add(TestCase* test) {
   tests.push_back(test);
@@ -123,40 +157,43 @@ void TestSuite::run() {
 \end{nodiff}
 
 \begin{episode}{验证头文件的自满足性}
-
 \begin{content}
 
 所谓头文件自满足性，即头文件自身是可编译成功的。为了验证头文件的自满足性，其实现文件需要第一个包含对应的头文件。如果此头文件不自满足，自然会导致编译失败，此方法是验证头文件是否自满足的一个有效方法。
 
-例如，对于头文件\ascii{include/mars/core/TestSuite.h}，在其相应的实现文件中，需要第一个包含自己的头文件。
+\subsubsection{样例}
+
+例如，对于头文件\ascii{TestSuite.h}，在其相应的\ascii{TestSuite.cc}之中，需要第一个包含自己的头文件。
 
 \begin{inlinediff}
  \begin{minicpp}
 // 反例
-#include "mars/core/TestCase.h"
-#include "mars/core/TestSuite.h"
+#include <mars/core/TestCase.h>
+#include <mars/core/TestSuite.h>
  \end{minicpp} 
 \tcblower
  \begin{minicpp}
 // 正例
-#include "mars/core/TestSuite.h"
-#include "mars/core/TestCase.h"
+#include <mars/core/TestSuite.h>
+#include <mars/core/TestCase.h>
  \end{minicpp} 
 \end{inlinediff}
 
 头文件作为代码所有者对外公开\ascii{API}的重要途径。在发布之前，有责任保证其可用性，及其最小依赖性。如果一个头文件不自满足，当客户需要引用该头文件时，则需要客户自行承担寻找相关依赖的职责。客户因缺乏相关上下文信息，寻找缺失的依赖并非易事。
 
-在极端条件下，头文件可能不存在相应的实现文件。例如，模板类或模板函数。此时，可以创建相应的测试文件，第一个包含其对应的头文件，校验头文件的自满足性；并对该模板实例化，实施简单的测试，确保编译与功能正确。
+\subsubsection{特例：泛型、内联、宏定义}
+
+在极端条件下，头文件可能不存在相应的实现文件。例如，模板类或模板函数，内联函数，宏定义。此时，可以创建相应的测试文件，第一个包含其对应的头文件，校验头文件的自满足性；并对该模板实例化，实施简单的测试，确保编译与功能正确。
 
 \begin{c++}[title={\ttfamily{实现ScopedExit：include/mars/util/ScopedExit.h}}]
-#include "mars/util/Symbol.h"
+#include <mars/util/Symbol.h>
 
 template <typename F>
 struct ScopedExit {
   ScopedExit(F f) : f(f) {
   }
 
-  ~ScopedExit(){ 
+  ~ScopedExit() { 
     f(); 
   }
 
@@ -169,11 +206,10 @@ ScopedExit<F> make_scoped_exit(F f) {
   return ScopedExit<F>(f);
 };
 
-#define SCOPED_EXIT(f) \
-    auto UNIQUE_NAME(scoped_exit_) = make_scoped_exit(f)
+#define SCOPED_EXIT(f) auto UNIQUE_NAME(scoped_exit_) = make_scoped_exit(f)
 \end{c++}
 
-其中，\ascii{UNIQUE\_NAME}是一个通用的宏，可以放在基础设施之中。
+其中，\ascii{UNIQUE\_NAME}是一个通用的宏，将其放在基础设施之中。
 
 \begin{c++}[title={\ttfamily{实用宏：include/mars/util/Symbol.h}}]
 #define __DO_JOIN_AGAIN(symbol1, symbol2) symbol1##symbol2
@@ -186,41 +222,25 @@ ScopedExit<F> make_scoped_exit(F f) {
 在测试文件中，第一个包含该头文件，并尝试最简单的单元测试。
 
 \begin{c++}[title={\ttfamily{测试ScopedExit：test/mars/util/ScopedExitSpec.cc}}]
-#include "mars/util/ScopedExit.h"
+#include <mars/util/ScopedExit.h>
 #include <gtest/gtest.h>
-#include <stdio.h>
 
-TEST(ScopedExitSpec, close_file_safely) {
-  auto file = std::fopen("~/.bashrc", "r");
-  SCOPED_EXIT([file] {
-    fclose(file);
+TEST(ScopedExitSpec, delete_memeory_safely) {
+  auto p = new int;
+  SCOPED_EXIT([p] {
+    delete p;
   });
 }
 \end{c++}
 
 \end{content}
-
 \end{episode}
 
 \subsection{内存泄露}
 
-\ascii{TestSuite}持有若干\ascii{TestCase}实例，引入析构函数释放动态创建并添加至\ascii{TestSuite}的所有\ascii{TestCase}实例。
+\ascii{TestSuite}持有若干\ascii{TestCase}实例，引入析构函数释放动态添加的\ascii{TestCase}实例。
 
 \begin{diff}{include/mars/core/TestSuite.h}
- \begin{minicpp}
-#include <vector>
-
-struct TestCase;
-
-struct TestSuite {
-  void add(TestCase* test);
-  void run();
-
-private:
-  std::vector<TestCase*> tests;
-};
- \end{minicpp}
-\tcblower
  \begin{minicpp}
 #include <vector>
 
@@ -234,27 +254,7 @@ struct TestSuite {
 
 private:
   std::vector<TestCase*> tests;
-};
- \end{minicpp}
-\end{diff}
-
-实现析构函数，释放动态内存。
-
-\begin{diff}{src/mars/core/TestSuite.cc}
- \begin{minicpp}
-#include "mars/core/TestSuite.h"
-#include "mars/core/TestCase.h"
-
-void TestSuite::add(TestCase* test) {
-  tests.push_back(test);
-}
-
-void TestSuite::run() {
-  for (auto test : tests) {
-    test->run();
-  }
-}
- \end{minicpp}
+}; \end{minicpp}
 \tcblower
  \begin{minicpp}
 #include "mars/core/TestSuite.h"
@@ -373,7 +373,7 @@ void TestSuite::run() {
  \end{minicpp}
 \end{diff}
 
-设计分离了两个变化方向，使其两者完全分离，并能独立变化。
+设计分离了两个变化方向，使其能够独立变化。
 
 \begin{enum}
   \eitem{\ascii{迭代算法：因存储结构变化而变化(目前实现为线性表)；}}
@@ -381,7 +381,6 @@ void TestSuite::run() {
 \end{enum}
 
 \begin{episode}{基于范围的for语句}
-
 \begin{content}
 
 存在泛型方法\ascii{foreach}的一种实现。不幸的是，它引入了复杂的\ascii{typedef typename}类型别名机制\footnote{\cpp{}也因诸如此类冗余的、复杂的类型说明，招致不公平的评论。}。
@@ -441,7 +440,6 @@ void foreach(const Container& c, F f) {
  \end{c++}
 
 \end{content}
-
 \end{episode}
 
 \section{嵌套结构}
