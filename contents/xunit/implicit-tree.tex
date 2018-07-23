@@ -333,8 +333,8 @@ private:
 
 \begin{diff}{src/mars/core/TestSuite.cc}
  \begin{minicpp}
-#include "mars/core/TestSuite.h"
-#include "mars/core/TestCase.h"
+#include <mars/core/TestSuite.h>
+#include <mars/core/TestCase.h>
 
 void TestSuite::add(TestCase* test) {
   tests.push_back(test);
@@ -354,8 +354,8 @@ void TestSuite::run() {
  \end{minicpp}
 \tcblower
  \begin{minicpp}
-#include "mars/core/TestSuite.h"
-#include "mars/core/TestCase.h"
+#include <mars/core/TestSuite.h>
+#include <mars/core/TestCase.h>
 
 void TestSuite::add(TestCase* test) {
   tests.push_back(test);
@@ -395,8 +395,8 @@ void TestSuite::run() {
 
 \begin{nodiff}{src/mars/core/TestSuite.cc}
  \begin{c++}
-#include "mars/core/TestSuite.h"
-#include "mars/core/TestCase.h"
+#include <mars/core/TestSuite.h>
+#include <mars/core/TestCase.h>
 #include <algorithm>
 
 TestSuite::~TestSuite() {
@@ -417,8 +417,8 @@ void TestSuite::run() {
 
 \begin{nodiff}{src/mars/core/TestSuite.cc}
  \begin{c++}
-#include "mars/core/TestSuite.h"
-#include "mars/core/TestCase.h"
+#include <mars/core/TestSuite.h>
+#include <mars/core/TestCase.h>
 #include <algorithm>
 
 template <typename F>
@@ -444,8 +444,8 @@ void TestSuite::run() {
 
 \begin{diff}{src/mars/core/TestSuite.cc}
  \begin{minicpp}
-#include "mars/core/TestSuite.h"
-#include "mars/core/TestCase.h"
+#include <mars/core/TestSuite.h>
+#include <mars/core/TestCase.h>
 #include <algorithm>
 
 template <typename F>
@@ -467,8 +467,8 @@ void TestSuite::run() {
  \end{minicpp}
 \tcblower
  \begin{minicpp}
-#include "mars/core/TestSuite.h"
-#include "mars/core/TestCase.h"
+#include <mars/core/TestSuite.h>
+#include <mars/core/TestCase.h>
 
 template <typename F>
 void TestSuite::foreach(F f) {
@@ -566,7 +566,11 @@ F for_each(Iterator first, Iterator last, F f) {
 \end{content}
 \end{episode}
 
+\end{content}
+
 \section{嵌套结构}
+
+\begin{content}
 
 为了实现更好的可扩展性，\ascii{TestSuite}不仅能打包\ascii{TestCase}实例，也应该能够打包\ascii{TestSuite}的子实例，实现隐式的树结构，如\refig{test-case-tree}所示。
 
@@ -585,8 +589,8 @@ F for_each(Iterator first, Iterator last, F f) {
 
 \begin{diff}{test/mars/core/TestSuiteSpec.cc}
  \begin{minicpp}
-#include "mars/core/TestSuite.h"
-#include "mars/core/TestCase.h"
+#include <mars/core/TestSuite.h>
+#include <mars/core/TestCase.h>
 #include <gtest/gtest.h>
 
 namespace {
@@ -612,8 +616,8 @@ TEST_F(TestSuiteSpec, pack_test_cases_into_test_suite) {
  \end{minicpp}
 \tcblower
  \begin{minicpp}
-#include "mars/core/TestSuite.h"
-#include "mars/core/TestCase.h"
+#include <mars/core/TestSuite.h>
+#include <mars/core/TestCase.h>
 #include <gtest/gtest.h>
 
 namespace {
@@ -654,8 +658,8 @@ TEST_F(TestSuiteSpec, pack_test_cases_into_test_suite) {
 
 \begin{nodiff}{test/mars/core/TestSuiteSpec.cc}
  \begin{c++}
-#include "mars/core/TestSuite.h"
-#include "mars/core/TestCase.h"
+#include <mars/core/TestSuite.h>
+#include <mars/core/TestCase.h>
 #include <gtest/gtest.h>
 
 namespace {
@@ -830,7 +834,7 @@ struct Matcher : SelfDescribing {
 此类接口类型，是纯接口类型的一个超集。它不仅包含纯虚函数，也包含默认实现的虚函数。甚至，可以提取私有的成员函数。
 
  \begin{c++}
-#include "hamcrest/core/Description.h"
+#include <hamcrest/core/Description.h>
 
 template <typename T>
 struct Matcher : SelfDescribing {
@@ -1014,53 +1018,27 @@ void TestSuite::run() {
  \label{fig:test-tree}
 \end{figure}
 
-\section{命名用例}
+\end{content}
+
+\section{命名机制}
+
+\begin{content}
 
 可以给每个\ascii{TestCase, TestSuite}命名，方便后期用例的定位与调试。
 
-\subsection{测试用例}
+\subsection{命名用例}
 
 \begin{nodiff}{test/mars/core/TestCaseSpec.cc}
  \begin{c++}
 #include <gtest/gtest.h>
 #include <mars/core/TestCase.h>
 
-namespace {
-  void assertName(const char* expected, const Test& test) {
-    ASSERT_EQ(std::string(expected), test.getName());
-  }
-}
-
 TEST(NamedTestCase, named_test_case) {
-  assertName("test case1", TestCase("test case1"));
+  TestCase test("test case")
+  assertName("test case", test.getName());
 }
  \end{c++}
 \end{nodiff}
-
-\subsection{通过测试}
-
-\subsubsection{重构Test}
-
-为了快速通过编译，增加抽象接口\ascii{Test::getName}。
-
-\begin{diff}{include/mars/core/Test.h}
- \begin{minicpp}
-struct Test {
-  virtual void run() = 0;  
-  virtual ~Test() {}
-};
- \end{minicpp}
- \tcblower
- \begin{minicpp}
-#include <string>
-
-struct Test {
-  virtual void run() = 0;
-  virtual const std::string& getName() const = 0;
-  virtual ~Test() {}
-};
- \end{minicpp}
-\end{diff}
 
 \subsubsection{重构TestCase}
 
@@ -1086,10 +1064,10 @@ private:
 
 struct TestCase : Test, private TestFixture {
   explicit TestCase(const std::string& = "");
+  const std::string& getName() const;
 
 private:
   void run() override;
-  const std::string& getName() const override;
 
 private:
   virtual void runTest() {}
@@ -1117,8 +1095,7 @@ void TestCase::run() {
 #include <mars/core/TestCase.h>
 
 TestCase::TestCase(const std::string& name)
-  : name(name) {
-}
+  : name(name) {}
 
 const std::string& TestCase::getName() const {
   return name;
@@ -1132,9 +1109,27 @@ void TestCase::run() {
  \end{minicpp}
 \end{diff}
 
+测试通过。
+
+\subsection{命名套件}
+
+依葫芦画瓢，\ascii{TestSuite}的名字实现与\ascii{TestCase}雷同。新增一个失败的用例，驱动实现\ascii{TestSuite}的命名机制。
+
+\begin{nodiff}{test/mars/core/TestSuiteSpec.cc}
+ \begin{c++}
+#include <gtest/gtest.h>
+#include <mars/core/TestSuite.h>
+
+TEST(NamedTestSuite, named_test_suite) {
+  TestSuite suite("test suite")
+  assertName("test suite", suite.getName());
+}
+ \end{c++}
+\end{nodiff}
+
 \subsubsection{重构TestSuite}
 
-依葫芦画瓢，\ascii{TestSuite}的名字实现与\ascii{TestCase}雷同。添加私有字段\ascii{name}，增加携带默认参数的构造函数，及其覆写\ascii{getName}成员函数。
+添加私有字段\ascii{name}，增加携带默认参数的构造函数，及其实现\ascii{getName}成员函数。
 
 \begin{diff}{include/mars/core/TestSuite.h}
  \begin{minicpp}
@@ -1165,10 +1160,10 @@ struct TestSuite : Test {
   explicit TestSuite(const std::string& = "");
   ~TestSuite();
 
+  const std::string& getName() const;
   void add(Test* test);
 
 private:
-  const std::string& getName() const override;
   void run() override;
 
 private:
@@ -1216,8 +1211,7 @@ void TestSuite::run() {
 #include <mars/core/TestSuite.h>
 
 TestSuite::TestSuite(const std::string& name)
-  : name(name) {
-}
+  : name(name) {}
 
 const std::string& TestSuite::getName() const {
   return name;
@@ -1252,14 +1246,7 @@ void TestSuite::run() {
 
 \subsection{消除重复}
 
-\ascii{TestCase}与\ascii{TestSuite}存在明显的结构性重复设计，包括相同的构造函数，覆写\ascii{getName}成员函数，私有字段\ascii{name}。为了消除重复，搬迁公共实现至父类。
-
-搬迁至父类需要关注两点：
-
-\begin{enum}
-  \eitem{\ascii{Test}的构造函数被声明为\ascii{public}，方便子类使用\ascii{using}语句直接复用构造函数；}
-  \eitem{\ascii{getName}没有必要声明为虚函数，因为在\ascii{Test}内已经完全具备实现的条件，子类强制继承\ascii{getName}的实现，拒绝被覆写。}
-\end{enum}
+\ascii{TestCase}与\ascii{TestSuite}存在明显的结构性重复设计，包括相同的构造函数，\ascii{getName}成员函数，私有字段\ascii{name}。为了消除重复，搬迁公共实现至父类。
 
 \subsubsection{重构Test}
 
@@ -1269,7 +1256,6 @@ void TestSuite::run() {
 
 struct Test {
   virtual void run() = 0;
-  virtual const std::string& getName() const = 0;
   virtual ~Test() {}
 };
  \end{minicpp}
@@ -1315,9 +1301,9 @@ const std::string& Test::getName() const {
 
 struct TestCase : Test {
   explicit TestCase(const std::string& = "");
+  const std::string& getName() const;
 
 private:
-  const std::string& getName() const override;
   void run() override;
 
 private:
@@ -1354,13 +1340,12 @@ private:
 
 struct TestSuite : Test {
   explicit TestSuite(const std::string& = "");
-
   ~TestSuite();
 
+  const std::string& getName() const;
   void add(Test*);
 
 private:
-  const std::string& getName() const override;
   void run() override;
 
 private:
@@ -1379,7 +1364,6 @@ private:
 
 struct TestSuite : Test {
   using Test::Test;
-
   ~TestSuite();
 
   void add(Test*);
