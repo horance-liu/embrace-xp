@@ -8,7 +8,7 @@
 
 \begin{content}
 
-本章重点讨论批量的用例组织和用例运行的实现方式。通过引入隐式的\emph{树结构}，提供了一种处理相似逻辑的一般性方法，极大地简化了客户组织用例与运行用例的实现逻辑。最后，为了区分每个测试用例，为其增加命名机制。
+本章重点讨论批式用例组织和运行的实现方式。通过引入隐式的\emph{树结构}，提供了一种处理相似逻辑的一般性方法，极大地简化了客户组织用例与运行用例的实现逻辑。最后，为了区分每个测试用例，为其增加命名机制。
 
 \end{content}
 
@@ -39,7 +39,7 @@ namespace {
   };
 }
 
-TEST(TestSuite, pack_multi_test_cases_into_test_suite) {
+TEST(TestSuiteSpec, pack_multi_test_cases_into_test_suite) {
   TestSuite suite;
   suite.add(new FooTest);
   suite.add(new FooTest);
