@@ -10,10 +10,1218 @@
 
 \end{content}
 
-\section{概念}
+\section{收集器}
 
 \begin{content}
 
+\subsection{测试夹具}
+
+\begin{nodiff}{test/mars/listener/TestCollectorSpec.cc}
+ \begin{c++}
+#include <mars/listener/TestCollector.h>
+#include <mars/core/TestCase.h>
+#include <mars/core/TestResult.h>
+#include <gtest/gtest.h>
+
+namespace {
+  struct TestCollectorSpec : testing::Test {
+  protected:
+    void run(::Test& test) {
+      test.run(result);
+    }
+
+  private:
+    void SetUp() override {
+      result.addListener(collector);
+    }
+
+  protected:
+    TestResult result;
+    TestCollector collector;
+  };
+}
+ \end{c++}
+\end{nodiff} 
+
+\subsection{运行计数器}
+
+\begin{nodiff}{test/mars/listener/TestCollectorSpec.cc}
+ \begin{c++}
+TEST_F(TestCollectorSpec, count_single_test_case) {
+  TestCase test;
+  run(test);
+  ASSERT_EQ(1, collector.runCount());
+}
+ \end{c++}
+\end{nodiff} 
+
+\subsubsection{关键抽象}
+
+提取监听器的抽象接口\ascii{TestListener}，它监听测试用例生命周期的关键事件。
+
+\begin{nodiff}{include/mars/core/TestListener.h}
+ \begin{c++}
+struct Test;
+
+struct TestListener {
+  virtual void startTestCase(const Test&) {}
+  virtual ~TestListener() {}
+};
+  \end{c++}
+\end{nodiff}
+
+\subsubsection{实现收集器}
+
+收集器\ascii{TestCollector.h}增加\emph{运行计数器}\ascii{numOfRuns}，增加查询接口\ascii{runCount}，覆写事件监听接口\ascii{startTestCase}。
+
+\begin{nodiff}{include/mars/listener/TestCollector.h}
+ \begin{c++}
+#include <mars/core/TestListener.h>
+
+struct TestCollector : TestListener {
+  TestCollector();
+
+  int runCount() const;
+
+private:
+  void startTestCase(const Test&) override;
+
+private:
+  int numOfRuns;
+};
+  \end{c++}
+\end{nodiff}
+
+在实现文件中，完成\emph{运行计数器}的初始化，查询接口\ascii{runCount}的代码逻辑，及其事件监听接口的实现逻辑。
+
+\begin{nodiff}{include/mars/listener/TestCollector.h}
+ \begin{c++}
+#include <mars/listener/TestCollector.h>
+
+TestCollector::TestCollector() : numOfRuns(0) {
+}
+
+int TestCollector::runCount() const {
+  return numOfRuns;
+}
+
+void TestCollector::startTestCase(const Test&) {
+  numOfRuns++;
+}
+ \end{c++}
+\end{nodiff}
+
+\subsubsection{注册监听器}
+
+在\ascii{TestResult.h}中，增加私有数据\ascii{listeners}，并对外公开监听器的注册接口\ascii{addListener}。此处，秉承“按照接口编程”的一致原则，使用抽象接口\ascii{TestListener}，而非具体实现的\emph{TestCollector}。另外，为了简化内存管理的复杂度，\ascii{TestResult}不管理\ascii{TestListener}列表的内存，它仅仅持有它们的指针。
+
+\begin{nodiff}{include/mars/listener/TestResult.h}
+ \begin{c++}
+#include <vector>
+
+struct TestListener;
+
+struct TestResult {
+  void addListener(TestListener&);
+
+  // ...
+
+private:
+  std::vector<TestListener*> listeners;
+};
+ \end{c++}
+\end{nodiff}
+
+在实现文件中，实现监听器注册接口\ascii{addListener}的实现逻辑。
+
+\begin{nodiff}{src/mars/listener/TestResult.cc}
+ \begin{c++}
+#include <mars/core/TestResult.h>
+
+// ...
+
+void TestResult::addListener(TestListener& listener) {
+  listeners.push_back(&listener);
+}
+ \end{c++}
+\end{nodiff}
+
+\subsubsection{广播监听器}
+
+在\ascii{TestResult.h}中，增加事件监听接口\ascii{startTestCase}。
+
+\begin{nodiff}{include/mars/listener/TestResult.h}
+ \begin{c++}
+#include <vector>
+
+struct Test;
+struct TestListener;
+
+struct TestResult {
+  void addListener(TestListener&);
+  void startTestCase(const Test&);
+
+  // ...
+
+private:
+  std::vector<TestListener*> listeners;
+};
+ \end{c++}
+\end{nodiff}
+
+在实现文件中，实现事件监听接口\ascii{startTestCase}的代码逻辑。它广播给所有的监听器，执行相关逻辑。
+
+\begin{nodiff}{src/mars/listener/TestResult.cc}
+ \begin{c++}
+#include <mars/core/TestResult.h>
+#include <mars/core/TestListener.h>
+
+// ...
+
+void TestResult::addListener(TestListener& listener) {
+  listeners.push_back(&listener);
+}
+
+void TestResult::startTestCase(const Test& test) {
+  for (auto listener : listeners) {
+    listener->startTestCase(test);
+  }
+}
+ \end{c++}
+\end{nodiff}
+
+\subsubsection{通知监听器}
+
+在\ascii{TestCase::run}实现中，调用\ascii{startTestCase}通知\ascii{TestResult}，测试用例已开始执行。
+
+\begin{nodiff}{src/mars/core/TestCase.cc}
+ \begin{c++}
+#include <mars/core/TestCase.h>
+#include <mars/core/TestResult.h>
+
+// ...
+
+#define PROTECT(method) \
+  result.protect(Functor(this, &TestCase::method,  "in the "#method))
+
+void TestCase::runBare(TestResult& result) {
+  if (PROTECT(setUp)) {
+    PROTECT(runTest);
+  }
+  PROTECT(tearDown);
+}
+
+void TestCase::run(TestResult& result) {
+  result.startTestCase(*this);
+  runBare(result);
+}
+ \end{c++}
+\end{nodiff}
+
+至此，测试通过。
+
+\subsection{失败计数器}
+
+构造一个失败的测试用例，收集器对外提供查询接口\ascii{failCount}，用于查询执行失败的用例数目。
+
+\begin{nodiff}{test/mars/listener/TestCollectorSpec.cc}
+ \begin{c++}
+namespace {
+  struct FailureOnRunningTest : TestCase {
+  private:
+    void runTest() override {
+      throw AssertionError("product.cc:57", "expected value == 2, but got 3");
+    }
+  };
+}
+
+TEST_F(TestCollectorSpec, throw_assertion_error_on_run_test) {
+  FailureOnRunningTest test;
+  run(test);
+  ASSERT_EQ(1, collector.failCount());
+}
+ \end{c++}
+\end{nodiff}
+
+\subsubsection{关键抽象}
+
+在抽象接口\ascii{TestListener}类型中增加事件监听接口\ascii{addFailure}，负责监听测试用例执行失败的事件。
+
+\begin{nodiff}{include/mars/core/TestListener.h}
+ \begin{c++}
+struct Test;
+struct TestFailure;
+
+struct TestListener {
+  virtual void startTestCase(const Test&) {}
+  virtual void addFailure(const TestFailure&) {}
+  virtual ~TestListener() {}
+};
+  \end{c++}
+\end{nodiff}
+
+\subsubsection{实现收集器}
+
+收集器\ascii{TestCollector.h}增加\emph{失败计数器}\ascii{numOfFails}，增加失败数目的查询接口\ascii{failCount}，及其覆写事件监听接口\ascii{addFailure}。
+
+\begin{nodiff}{include/mars/listener/TestCollector.h}
+ \begin{c++}
+#include <mars/core/TestListener.h>
+
+struct TestCollector : TestListener {
+  TestCollector();
+
+  int runCount() const;
+  int failCount() const;
+
+private:
+  void startTestCase(const Test&) override;
+  void addFailure(const TestFailure&) override;
+
+private:
+  int numOfRuns;
+  int numOfFails;
+};
+ \end{c++}
+\end{nodiff}
+
+在实现文件中，完成\emph{失败计数器}的初始化，查询接口\ascii{failCount}的代码逻辑，事件监听接口\ascii{addFailure}的实现逻辑。
+
+\begin{nodiff}{src/mars/listener/TestCollector.cc}
+ \begin{c++}
+#include <mars/listener/TestCollector.h>
+
+TestCollector::TestCollector()
+  : numOfRuns(0), numOfFails(0) {}
+
+int TestCollector::runCount() const {
+  return numOfRuns;
+}
+
+int TestCollector::failCount() const {
+  return numOfFails;
+}
+
+void TestCollector::startTestCase(const Test&) {
+  numOfRuns++;
+}
+
+void TestCollector::addFailure(const TestFailure&) {
+  numOfFails++;
+}
+ \end{c++}
+\end{nodiff}
+
+\subsubsection{广播监听器}
+
+当执行\ascii{addFailure, addError}时，广播给所有的监听者执行相关逻辑。显而易见，此处存在明显的重复设计。
+
+\begin{nodiff}{src/mars/listener/TestResult.cc}
+ \begin{c++}
+#include <mars/core/TestResult.h>
+#include <mars/core/TestListener.h>
+
+// ...
+
+void TestResult::startTestCase(const Test& test) {
+  for (auto listener : listeners) {
+    listener->startTestCase(test);
+  }
+}
+
+inline void TestResult::addFailure(std::string&& msg) {
+  failures.emplace_back(std::move(msg), true);
+  for (auto listener : listeners) {
+    listener->addFailure(failures.back());
+  }
+}
+
+inline void TestResult::addError(std::string&& msg) {
+  failures.emplace_back(std::move(msg), false);
+  for (auto listener : listeners) {
+    listener->addFailure(failures.back());
+  }
+}
+
+namespace {
+  std::string msg(const char* why, const char* where, const char* what) {
+    return std::string(why) + ' ' + where + '\n' + what;
+  }
+}
+
+#define ON_FAIL(except)  addFailure(msg(except, f.where(), e.what()))
+#define ON_ERROR(except) addError(msg(except, f.where(), e.what()))
+
+// ...
+ \end{c++}
+\end{nodiff}
+
+测试通过。
+
+\subsubsection{消除重复}
+
+为了消除重复，此处提取了一个宏函数\ascii{BOARDCAST}。另外，为了消除既有\ascii{addFailure, addError}的重复逻辑，将其合二为一。
+
+\begin{nodiff}{src/mars/listener/TestResult.cc}
+ \begin{c++}
+#include <mars/core/TestResult.h>
+#include <mars/core/TestListener.h>
+
+// ...
+
+#define BOARDCAST(action) for (auto listener : listeners) listener->action
+
+void TestResult::startTestCase(const Test& test) {
+  BOARDCAST(startTestCase(test));
+}
+
+void TestResult::addFailure(std::string& msg, bool failure) {
+  failures.emplace_back(std::move(msg), failure);
+  BOARDCAST(addFailure(failures.back()));
+}
+
+namespace {
+  std::string msg(const char* why, const char* where, const char* what) {
+    return std::string(why) + ' ' + where + '\n' + what;
+  }
+}
+
+#define ON_FAIL(except)  addFailure(msg(except, f.where(), e.what()), true)
+#define ON_ERROR(except) addFailure(msg(except, f.where(), e.what()), false)
+
+// ...
+ \end{c++}
+\end{nodiff}
+
+\subsection{错误计数器}
+
+构造一个失败的测试用例，收集器对外提供查询接口\ascii{errorCount}，用于查询执行错误的用例数目。
+
+\begin{nodiff}{test/mars/listener/TestCollectorSpec.cc}
+ \begin{c++}
+namespace {
+  struct ErrorOnRunningTest : TestCase {
+   void runTest() override {
+      throw std::exception();
+    }
+  };
+}
+
+TEST_F(TestCollectorSpec, throw_std_exception_on_run_test) {
+  ErrorOnRunningTest test;
+  run(test);
+  ASSERT_EQ(1, collector.errorCount());
+}
+ \end{c++}
+\end{nodiff}
+
+\subsubsection{实现收集器}
+
+收集器\ascii{TestCollector.h}增加\emph{错误计数器}\ascii{numOfErrors}，及其查询接口\ascii{errorCount}。
+
+\begin{nodiff}{include/mars/listener/TestCollector.h}
+ \begin{c++}
+#include <mars/core/TestListener.h>
+
+struct TestCollector : TestListener {
+  TestCollector();
+
+  int runCount() const;
+  int failCount() const;
+  int errorCount() const;
+
+private:
+  void startTestCase(const Test&) override;
+  void addFailure(const TestFailure&) override;
+
+private:
+  int numOfRuns;
+  int numOfFails;
+  int numOfErrors;
+};
+ \end{c++}
+\end{nodiff}
+
+在实现文件中，追加实现\ascii{numOfErrors}的初始化，实现查询接口\ascii{errorCount}的代码逻辑，重构\ascii{addFailure}的既有实现，根据\ascii{TestFailure}是否为错误，分别累加不同的计数器。。
+
+\begin{nodiff}{include/mars/listener/TestCollector.h}
+ \begin{c++}
+#include <mars/listener/TestCollector.h>
+#include <mars/except/TestFailure.h>
+
+TestCollector::TestCollector()
+  : numOfRuns(0)
+  , numOfFails(0)
+  , numOfErrors(0) {}
+
+int TestCollector::runCount() const {
+  return numOfRuns;
+}
+
+int TestCollector::failCount() const {
+  return numOfFails;
+}
+
+int TestCollector::errorCount() const {
+  return numOfErrors;
+}
+
+void TestCollector::startTestCase(const Test&) {
+  numOfRuns++;
+}
+
+void TestCollector::addFailure(const TestFailure& f) {
+  f.isFailure() ? numOfFails++ : numOfErrors++;
+}
+ \end{c++}
+\end{nodiff}
+
+\subsection{通过计数器}
+
+构造一个失败的测试用例，收集器对外提供查询接口\ascii{passCount}，用于查询执行通过的用例数目。
+
+\begin{nodiff}{test/mars/listener/TestCollectorSpec.cc}
+ \begin{c++}
+#include <mars/core/TestSuite.h>
+
+namespace {
+  struct ErrorOnRunningTest : TestCase {
+   void runTest() override {
+      throw std::exception();
+    }
+  };
+}
+
+TEST_F(TestCollectorSpec, count_test_cases_from_collector) {
+  TestSuite suite;
+  suite.add(new TestCase);
+  suite.add(new FailureOnRunningTest);
+
+  run(suite);
+
+  ASSERT_EQ(2, collector.runCount());
+  ASSERT_EQ(1, collector.passCount());
+  ASSERT_EQ(1, collector.failCount());
+}
+ \end{c++}
+\end{nodiff}
+
+\subsubsection{实现收集器}
+
+收集器\ascii{TestCollector.h}增加\emph{通过计数器}\ascii{numOfPassed}，及其标记位\ascii{lastFailed}，增加查询接口\ascii{passCount}。其中，\ascii{lastFailed}用于标记最近的一个测试用例是否执行成功。
+
+\begin{nodiff}{include/mars/listener/TestCollector.h}
+ \begin{c++}
+#include <mars/core/TestListener.h>
+
+struct TestCollector : TestListener {
+  TestCollector();
+
+  int runCount() const;
+  int failCount() const;
+  int errorCount() const;
+  int passCount() const;
+
+private:
+  void startTestCase(const Test&) override;
+  void addFailure(const TestFailure&) override;
+
+private:
+  int numOfRuns;
+  int numOfFails;
+  int numOfErrors;
+  int numOfPassed;
+  bool lastFailed;
+};
+ \end{c++}
+\end{nodiff}
+
+在实现文件中，当收到\ascii{startTestCase}事件时，将\ascii{lastFailed}重新初始化为\ascii{false}。当收到\ascii{startTestCase}事件时，将\ascii{lastFailed}标记置为\ascii{true}。当收到\ascii{endTestCase}事件时，如果\ascii{lastFailed}为\ascii{false}，则累计\emph{通过计数器}\ascii{numOfPassed}。
+
+\begin{nodiff}{src/mars/listener/TestCollector.cc}
+ \begin{c++}
+#include <mars/listener/TestCollector.h>
+#include <mars/except/TestFailure.h>
+
+TestCollector::TestCollector()
+  : numOfRuns(0)
+  , numOfFails(0)
+  , numOfErrors(0)
+  , numOfPassed(0)
+  , lastFailed(false) {}
+
+int TestCollector::runCount() const {
+  return numOfRuns;
+}
+
+int TestCollector::failCount() const {
+  return numOfFails;
+}
+
+int TestCollector::errorCount() const {
+  return numOfErrors;
+}
+
+int TestCollector::passCount() const {
+  return numOfPassed;
+}
+
+void TestCollector::startTestCase(const Test&) {
+  numOfRuns++;
+  lastFailed = false;
+}
+
+void TestCollector::endTestCase(const Test&) {
+  if (!lastFailed) numOfPassed++;
+}
+
+void TestCollector::addFailure(const TestFailure& f) {
+  f.isFailure() ? numOfFails++ : numOfErrors++;
+  lastFailed = true;
+}
+ \end{c++}
+\end{nodiff}
+
+\subsubsection{广播监听器}
+
+在\ascii{TestResult}中，增加\ascii{endTestCase}事件监听接口，它广播所有监听器该事件的到达消息。
+
+\begin{nodiff}{src/mars/listener/TestResult.cc}
+ \begin{c++}
+#include <mars/core/TestResult.h>
+#include <mars/core/TestListener.h>
+
+// ...
+
+void TestResult::addListener(TestListener& listener) {
+  listeners.push_back(&listener);
+}
+
+#define BOARDCAST(action) for (auto listener : listeners) listener->action
+
+void TestResult::startTestCase(const Test& test) {
+  BOARDCAST(startTestCase(test));
+}
+
+void TestResult::endTestCase(const Test& test) {
+  BOARDCAST(endTestCase(test));
+}
+
+void TestResult::addFailure(std::string&& msg, bool failure) {
+  failures.emplace_back(std::move(msg), failure);
+  BOARDCAST(addFailure(failures.back()));
+}
+
+namespace {
+  std::string msg(const char* why, const char* where, const char* what) {
+    return std::string(why) + ' ' + where + '\n' + what;
+  }
+}
+
+#define ON_FAIL(except)  addFailure(msg(except, f.where(), e.what()), true)
+#define ON_ERROR(except) addFailure(msg(except, f.where(), e.what()), false)
+
+// ...
+ \end{c++}
+\end{nodiff}
+
+\subsubsection{通知监听器}
+
+在\ascii{TestCase::run}实现中，追加实现\ascii{TestResult::endTestCase}事件的通知消息。
+
+\begin{nodiff}{src/mars/core/TestCase.cc}
+ \begin{c++}
+#include <mars/core/TestCase.h>
+#include <mars/core/TestResult.h>
+
+// ...
+
+#define PROTECT(method) \
+  result.protect(Functor(this, &TestCase::method,  "in the "#method))
+
+void TestCase::runBare(TestResult& result) {
+  if (PROTECT(setUp)) {
+    PROTECT(runTest);
+  }
+  PROTECT(tearDown);
+}
+
+void TestCase::run(TestResult& result) {
+  result.startTestCase(*this);
+  runBare(result);
+  result.endTestCase(*this);  
+}
+ \end{c++}
+\end{nodiff}
+
+测试通过。
+
+\end{content}
+
+\section{状态查询器}
+
+\begin{content}
+
+存在一种场景，用户只关心用例是否执行成功。按照既有的实现逻辑，可以在\ascii{TestCollector}增加\ascii{successful}的状态查询接口。但是，考虑到此需求可能被用户单独使用，提炼该实现至一个新的监听器\ascii{TestStatus}，其职责非常单一。
+
+\subsection{测试夹具}
+
+\begin{nodiff}{test/mars/listener/TestStatusSpec.cc}
+ \begin{c++}
+#include <mars/listener/TestStatus.h>
+#include <mars/core/TestResult.h>
+#include <mars/core/TestCase.h>
+#include <gtest/gtest.h>
+
+namespace {
+  struct TestStatusSpec : testing::Test {
+  protected:
+    void run(::Test& test) {
+      test.run(result);
+    }
+
+  private:
+    void SetUp() override {
+      result.addListener(status);
+    }
+
+  protected:
+    TestResult result;
+    TestStatus status;
+  };
+}
+ \end{c++}
+\end{nodiff}
+
+\subsection{成功场景}
+
+\begin{nodiff}{test/mars/listener/TestStatusSpec.cc}
+ \begin{c++}
+TEST_F(TestStatusSpec, should_be_successful) {
+  TestCase test;
+  run(test);
+  ASSERT_TRUE(status.successful());
+}
+ \end{c++}
+\end{nodiff}
+
+\subsubsection{实现状态查询器}
+
+\ascii{TestStatus}只用监听\ascii{addFailure}事件，对外提供状态查询接口\ascii{successful}。
+
+\begin{nodiff}{include/mars/listener/TestStatus.h}
+ \begin{c++}
+struct TestStatus {
+  TestStatus();
+  bool successful() const;
+
+private:
+  bool succ;
+};
+ \end{c++}
+\end{nodiff}
+
+在实现文件中，初始状态下，\ascii{TestStatus}将其标记位\ascii{succ}置为\ascii{true}，其状态查询接口\ascii{successful}直接返回标记位\ascii{succ}的当前值。
+
+\begin{nodiff}{src/mars/listener/TestStatus.cc}
+ \begin{c++}
+#include <mars/listener/TestStatus.h>
+
+TestStatus::TestStatus() : succ(true) {
+}
+
+bool TestStatus::successful() const {
+  return succ;
+}
+ \end{c++}
+\end{nodiff}
+
+测试通过。
+
+\subsection{失败场景}
+
+\begin{nodiff}{test/mars/listener/TestStatusSpec.cc}
+ \begin{c++}
+namespace {
+  struct FailureOnRunningTest : TestCase {
+  private:
+    void runTest() override {
+      throw AssertionError("product.cc:57", "expected value == 2, but got 3");
+    }
+  };
+}
+
+TEST_F(TestStatusSpec, should_be_failed) {
+  FailureOnRunningTest test;
+  run(test);
+  ASSERT_FALSE(status.successful());
+}
+ \end{c++}
+\end{nodiff}
+
+\subsubsection{实现状态查询器}
+
+\ascii{TestStatus}增加事件监听接口\ascii{addFailure}。
+
+\begin{nodiff}{include/mars/listener/TestStatus.h}
+ \begin{c++}
+#include <mars/core/TestListener.h>
+
+struct TestStatus : TestListener {
+  TestStatus();
+  bool successful() const;
+
+private:
+  void addFailure(const TestFailure&) override;
+
+private:
+  bool succ;
+};
+ \end{c++}
+\end{nodiff}
+
+在实现文件中，一旦收到\ascii{addFailure}事件的通知消息，将标记位\ascii{succ}置为\ascii{false}。
+
+\begin{nodiff}{src/mars/listener/TestStatus.cc}
+ \begin{c++}
+#include <mars/listener/TestStatus.h>
+
+TestStatus::TestStatus() : succ(true) {
+}
+
+bool TestStatus::successful() const {
+  return succ;
+}
+
+void TestStatus::addFailure(const TestFailure&) {
+  succ = false;
+}
+ \end{c++}
+\end{nodiff}
+
+测试通过。
+
+\end{content}
+
+\section{错误列表}
+
+\begin{content}
+
+在遗留的系统实现中，\ascii{TestResult}通过暴露\ascii{listFailures}的查询接口，返回整个错误列表给用户。用户通过操作\ascii{std::vector}的数据结构，自行获取其感兴趣的信息。这样的设计，不仅导致客户端代码产生大量重复的\ascii{for}语句，而且使得\ascii{TestResult}的私有存储结构暴露到众多客户之下，丢失了基本的封装特性。
+
+\subsection{测试夹具}
+
+\begin{nodiff}{test/mars/listener/TestStatusSpec.cc}
+ \begin{c++}
+#include <mars/listener/FailureList.h>
+#include <mars/core/TestCase.h>
+#include <mars/core/TestResult.h>
+#include <gtest/gtest.h>
+
+struct FailureListSpec : testing::Test {
+protected:
+  void run(::Test& test) {
+    test.run(result);
+  }
+
+private:
+  void SetUp() override {
+    result.addListener(list);
+  }
+
+protected:
+  FailureLister list;
+  TestResult result;
+};
+ \end{c++}
+\end{nodiff}
+
+\subsection{异常信息}
+
+\begin{nodiff}{test/mars/listener/FailureListSpec.cc}
+ \begin{c++}
+namespace {
+  struct FailureOnRunningTest : TestCase {
+    const char* expectMsg() const {
+      return "assertion fail in the runTest\n"
+             "product.cc:57\n"
+             "expected value == 2, but got 3";
+    }
+
+  private:
+    void runTest() override {
+      throw AssertionError("product.cc:57", "expected value == 2, but got 3");
+    }
+  };
+}
+
+TEST_F(FailureListerSpec, extract_except_msg_on_running_test_failed) {
+  FailureOnRunningTest test;
+  run(test);
+
+  list.foreach([&test](auto& fail) {
+    ASSERT_TRUE(fail.isFailure());
+    ASSERT_EQ(test.expectMsg(), fail.getExceptionMsg());
+  });
+}
+ \end{c++}
+\end{nodiff}
+
+\subsubsection{实现错误列表}
+
+\ascii{FailureList}只用监听\ascii{addFailure}事件，对外提供查询接口\ascii{foreach}。
+
+\begin{nodiff}{include/mars/listener/FailureList.h}
+ \begin{c++}
+#include <vector>
+#include <mars/core/TestListener.h>
+#include <mars/except/TestFailure.h>
+
+struct TestFailure;
+
+struct FailureList : TestListener {
+  template <typename F>
+  void foreach(F f) const {
+    for (auto failure : failures) {
+      f(*failure);
+    }
+  }
+
+private:
+  void addFailure(const TestFailure&) override;
+
+private:
+  std::vector<const TestFailure*> failures;
+};
+ \end{c++}
+\end{nodiff}
+
+在其实现文件中，实现\ascii{addFailure}的实现逻辑。
+
+\begin{nodiff}{src/mars/listener/FailureList.cc}
+ \begin{c++}
+#include <mars/listener/FailureList.h>
+
+void FailureList::addFailure(const TestFailure& f) {
+  failures.push_back(&f);
+}
+ \end{c++}
+\end{nodiff}
+
+测试通过。此时，便可以安全删除\ascii{TestResult::getFailures}的查询接口，及其相关逻辑，职责搬迁完毕。
+
+\end{content}
+
+\section{文本进度条}
+
+\begin{content}
+
+\subsection{测试夹具}
+
+\begin{nodiff}{test/mars/listener/text/TextProgressSpec.cc}
+ \begin{c++}
+#include <mars/listener/text/TextProgress.h>
+#include <mars/core/TestResult.h>
+#include <mars/core/TestCase.h>
+#include <mars/core/TestSuite.h>
+#include <mars/except/AssertionError.h>
+#include <gtest/gtest.h>
+#include <sstream>
+
+namespace {
+  struct TextProgressSpec : testing::Test {
+  protected:
+    TextProgressSpec() : progress(ss) {
+      result.addListener(progress);
+    }
+
+    void run(::Test& test) {
+      result.runRootTest(test);
+    }
+
+    void assertOutput(const char* output) {
+      ASSERT_EQ(ss.str(), output);
+    }
+
+  protected:
+    TestResult result;
+    std::ostringstream ss;
+    TextProgress progress;
+  };
+}
+ \end{c++}
+\end{nodiff}
+
+\subsection{成功场景}
+
+\begin{nodiff}{test/mars/listener/text/TextProgressSpec.cc}
+ \begin{c++}
+TEST_F(TextProgressSpec, single_test_case_is_successful) {
+  TestCase test;
+  run(test);
+  assertOutput("starting...\n*\nend.\n");
+}
+ \end{c++}
+\end{nodiff}
+
+一个测试用例，使用一个\ascii{*}表示，打印效果如下：
+
+\begin{nodiff}{输出效果}
+ \begin{c++}
+starting...
+*
+end.
+ \end{c++}
+\end{nodiff}
+
+\subsubsection{监听事件}
+
+\begin{nodiff}{include/mars/core/TestListener.h}
+ \begin{c++}
+struct Test;
+struct TestFailure;
+
+struct TestListener {
+  virtual void startTestRun(const Test&) {}
+  virtual void endTestRun(const Test&) {}
+
+  virtual void startTestCase(const Test&) {}
+  virtual void endTestCase(const Test&) {}
+
+  virtual void addFailure(const TestFailure&) {}
+
+  virtual ~TestListener() {}
+};
+ \end{c++}
+\end{nodiff}
+
+\subsubsection{入口函数}
+
+\begin{nodiff}{include/mars/core/TestResult.h}
+ \begin{c++}
+#include <mars/core/TestResult.h>
+#include <mars/core/TestListener.h>
+#include <mars/core/Test.h>
+
+#define BOARDCAST(action) \
+  for (auto listener : listeners) listener->action
+
+void TestResult::runRootTest(Test& test) {
+  BOARDCAST(startTestRun(test));
+  test.run(*this);
+  BOARDCAST(endTestRun(test));
+}
+ \end{c++}
+\end{nodiff}
+
+\subsubsection{实现文本进度条}
+
+\begin{nodiff}{include/mars/listener/text/TextProgress.h}
+ \begin{c++}
+#include <mars/core/TestListener.h>
+#include <ostream>
+
+struct TextProgress : TestListener {
+  explicit TextProgress(std::ostream&);
+
+private:
+  void startTestRun(const Test&) override;
+  void startTestCase(const Test&) override;
+  void endTestRun(const Test&) override;
+
+private:
+  std::ostream& out;
+};
+ \end{c++}
+\end{nodiff}
+
+\begin{nodiff}{src/mars/listener/text/TextProgress.cc}
+ \begin{c++}
+#include <mars/listener/text/TextProgress.h>
+
+TextProgress::TextProgress(std::ostream& out)
+  : out(out) {}
+
+void TextProgress::startTestRun(const Test&) {
+  out << "starting..."
+      << std::endl;
+}
 
 
-\subsection{异常类型}
+void TextProgress::startTestCase(const Test&) {
+  out << '*';
+}
+
+void TextProgress::endTestRun(const Test&) {
+  out << std::endl
+      << "end."
+      << std::endl
+      << std::flush;
+}
+ \end{c++}
+\end{nodiff}
+
+\subsection{失败场景}
+
+\begin{nodiff}{test/mars/listener/text/TextProgressSpec.cc}
+ \begin{c++}
+namespace {
+  struct FailureOnRunningTest : TestCase {
+  private:
+    void runTest() override {
+      throw AssertionError("product.cc:57", "expected value == 2, but got 3");
+    }
+  };
+}
+
+TEST_F(TextProgressSpec, contains_failed_test_case) {
+  TestSuite suite;
+  suite.add(new TestCase);
+  suite.add(new FailureOnRunningTest);
+
+  run(suite);
+  assertOutput("starting...\n**F\nend.\n");
+}
+ \end{c++}
+\end{nodiff}
+
+一个测试用例，使用一个\ascii{*}表示，打印效果如下：
+
+\begin{nodiff}{输出效果}
+ \begin{c++}
+starting...
+**F
+end.
+ \end{c++}
+\end{nodiff}
+
+\subsubsection{覆写addFailure}
+
+\begin{nodiff}{include/mars/listener/text/TextProgress.h}
+ \begin{c++}
+#include <mars/core/TestListener.h>
+#include <ostream>
+
+struct TextProgress : TestListener {
+  explicit TextProgress(std::ostream&);
+
+private:
+  void startTestRun(const Test&) override;
+  void startTestCase(const Test&) override;
+  void addFailure(const TestFailure&) override;  
+  void endTestRun(const Test&) override;
+
+private:
+  std::ostream& out;
+};
+ \end{c++}
+\end{nodiff}
+
+\begin{nodiff}{src/mars/listener/text/TextProgress.cc}
+ \begin{c++}
+#include <mars/listener/text/TextProgress.h>
+
+TextProgress::TextProgress(std::ostream& out)
+  : out(out) {}
+
+void TextProgress::startTestRun(const Test&) {
+  out << "starting..."
+      << std::endl;
+}
+
+void TextProgress::startTestCase(const Test&) {
+  out << '*';
+}
+
+void TextProgress::addFailure(const TestFailure&) {
+  out << 'F';
+}
+
+void TextProgress::endTestRun(const Test&) {
+  out << std::endl
+      << "end."
+      << std::endl
+      << std::flush;
+}
+ \end{c++}
+\end{nodiff}
+
+\subsection{错误场景}
+
+\begin{nodiff}{test/mars/listener/text/TextProgressSpec.cc}
+ \begin{c++}
+namespace {
+  struct ErrorOnRunningTest : TestCase {
+   void runTest() override {
+      throw std::exception();
+    }
+  };
+}
+
+TEST_F(TextProgressSpec, contains_error_test_case) {
+  TestSuite suite;
+  suite.add(new TestCase);
+  suite.add(new ErrorOnRunningTest);
+
+  run(suite);
+  assertOutput("starting...\n**E\nend.\n");
+}
+ \end{c++}
+\end{nodiff}
+
+一个测试用例，使用一个\ascii{*}表示，打印效果如下：
+
+\begin{nodiff}{输出效果}
+ \begin{c++}
+starting...
+**E
+end.
+ \end{c++}
+\end{nodiff}
+
+\subsubsection{覆写addFailure}
+
+\begin{nodiff}{src/mars/listener/text/TextProgress.cc}
+ \begin{c++}
+#include <mars/listener/text/TextProgress.h>
+
+// ...
+
+void TextProgress::addFailure(const TestFailure& f) {
+  out << (f.isFailure() ? 'F' : 'E');
+}
+ \end{c++}
+\end{nodiff}
+
+测试通过。
+
+\end{content}
+
+\section{生命周期}
+
+\begin{content}
+
+\begin{nodiff}{include/mars/core/TestListener.h}
+ \begin{c++}
+struct Test;
+struct TestFailure;
+
+struct TestListener {
+  virtual void startTestRun(const Test&) {}
+  virtual void endTestRun(const Test&) {}
+
+  virtual void startTestSuite(const Test&) {}
+  virtual void endTestSuite(const Test&) {}
+
+  virtual void startTestCase(const Test&) {}
+  virtual void endTestCase(const Test&) {}
+
+  virtual void addFailure(const TestFailure&) {}
+
+  virtual ~TestListener() {}
+};
+ \end{c++}
+\end{nodiff}
+
+\end{content}
+

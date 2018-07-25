@@ -452,9 +452,9 @@ inline void TestResult::addError(std::string&& msg) {
 
 \begin{content}
 
-\subsection{测试用例}
+\subsection{失败}
 
-使用字符串表示异常信息是一种脆弱的设计，可以将其重构为值对象，从而得到更稳定的设计。首先，重构既有的测试用例，使其失败。
+使用字符串表示异常信息是一种脆弱的设计，可以将其重构为值对象，从而得到更稳定的设计。重构既有的测试用例，使其失败。
 
 \begin{nodiff}{test/mars/core/TestCaseSpec.cc}
  \begin{c++}
@@ -489,19 +489,18 @@ TEST_F(TestCaseSpec, extract_except_msg_on_running_test_failed) {
 
 测试用例使用\ascii{auto}自动类型推演，没有显式给出具体的类型。但是，该值对象约定具有\ascii{isFailure， getExceptionMsg}的接口定义。
 
-\subsection{定义值对象}
+\subsubsection{引入值对象}
 
 为了快速通过测试，定义值对象\ascii{TestFailure}，相对原生的\ascii{std::string}，它相对更加稳定和抽象，并更具有表达力。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{include/mars/except/TestFailure.h}}]
+\begin{nodiff}{include/mars/except/TestFailure.h}
+ \begin{c++}
 #include <string>
 
 struct TestFailure {
   TestFailure(std::string&& msg, bool failure);
 
   bool isFailure() const;
-  bool isError() const;
   const std::string& getExceptionMsg() const;
 
 private:
@@ -509,20 +508,16 @@ private:
   bool failure;
 };
  \end{c++}
-\end{leftbar}
+\end{nodiff}
 
 其实现非常简单。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{src/mars/except/TestFailure.cc}}]
-#include "mars/except/TestFailure.h"
+\begin{nodiff}{src/mars/except/TestFailure.cc}
+ \begin{c++}
+#include <mars/except/TestFailure.h>
 
 TestFailure::TestFailure(std::string&& msg, bool failure)
   : msg(std::move(msg)), failure(failure) {
-}
-
-bool TestFailure::isError() const {
-  return !failure;
 }
 
 bool TestFailure::isFailure() const {
@@ -533,166 +528,14 @@ const std::string& TestFailure::getExceptionMsg() const {
   return msg;
 }
  \end{c++}
-\end{leftbar}
+\end{nodiff}
 
-\subsection{重构：断言失败}
+\subsubsection{重构TestResult}
 
 将\code{failures}的元素类型\code{std::string}重构为\code{TestFailure}。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{include/mars/core/TestResult.h}}]
-#include <vector>
-#include <string>
-#include "mars/except/TestFailure.h"
-
-struct TestCaseFunctor;
-
-struct TestResult {
-  int failCount() const;
-  int errorCount() const;
-
-  const std::vector<TestFailure>& getFailures() const;
-  const std::vector<std::string>& getErrors() const;
-
-  bool protect(const TestCaseFunctor&);
-
-private:
-  void onFail(std::string&& msg);
-  void onError(std::string&& msg);
-
-private:
-  std::vector<TestFailure> failures;
-  std::vector<std::string> errors;
-};
- \end{c++}
-\end{leftbar}
-
-在实现文件中，重构完成\ascii{TestFailure}的缓存。
-
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{src/mars/core/TestResult.cc}}]
-#include "mars/core/TestResult.h"
-#include "mars/core/internal/TestCaseFunctor.h"
-#include "mars/except/AssertionError.h"
-
-// ...
-
-const std::vector<TestFailure>& TestResult::getFailures() const {
-  return failures;
-}
-
-const std::vector<std::string>& TestResult::getErrors() const {
-  return errors;
-}
-
-bool TestResult::protect(const TestCaseFunctor& f) {
-  try {
-    return f();
-  } catch (const AssertionError& e) {
-    onFail(std::string("assertion fail") + " " + f.where() + "\n" + e.what());
-  } catch (const std::exception& e) {
-    onError(std::string("uncaught std::exception") + " " + f.where() + "\n" + e.what());
-  } catch (...) {
-    onError(std::string("uncaught unknown exception") + " " + f.where() + "\n" + "");
-  }
-  return false;
-}
-
-void TestResult::onFail(std::string&& msg) {
-  failures.emplace_back(std::move(msg), true);
-}
-
-void TestResult::onError(std::string&& msg) {
-  errors.emplace_back(std::move(msg));
-}
- \end{c++}
-\end{leftbar}
-
-至此，测试通过。
-
-\subsection{重构：错误}
-
-依葫芦画瓢，添加测试用例，
-
-将\code{errors}的元素类型\code{std::string}重构为\code{TestFailure}。
-
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{include/mars/core/TestResult.h}}]
-#include <vector>
-#include <string>
-#include "mars/except/TestFailure.h"
-
-struct TestCaseFunctor;
-
-struct TestResult {
-  int failCount() const;
-  int errorCount() const;
-
-  const std::vector<TestFailure>& getFailures() const;
-  const std::vector<TestFailure>& getErrors() const;
-
-  bool protect(const TestCaseFunctor&);
-
-private:
-  void onFail(std::string&& msg);
-  void onError(std::string&& msg);
-
-private:
-  std::vector<TestFailure> failures;
-  std::vector<TestFailure> errors;
-};
- \end{c++}
-\end{leftbar}
-
-在实现文件中，重构完成\ascii{TestFailure}的构造与缓存。
-
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{src/mars/core/TestResult.cc}}]
-#include "mars/core/TestResult.h"
-#include "mars/core/internal/TestCaseFunctor.h"
-#include "mars/except/AssertionError.h"
-
-// ...
-
-const std::vector<TestFailure>& TestResult::getFailures() const {
-  return failures;
-}
-
-const std::vector<TestFailure>& TestResult::getErrors() const {
-  return errors;
-}
-
-bool TestResult::protect(const TestCaseFunctor& f) {
-  try {
-    return f();
-  } catch (const AssertionError& e) {
-    onFail(std::string("assertion fail") + " " + f.where() + "\n" + e.what());
-  } catch (const std::exception& e) {
-    onError(std::string("uncaught std::exception") + " " + f.where() + "\n" + e.what());
-  } catch (...) {
-    onError(std::string("uncaught unknown exception") + " " + f.where() + "\n" + "");
-  }
-  return false;
-}
-
-void TestResult::onFail(std::string&& msg) {
-  failures.emplace_back(std::move(msg), true);
-}
-
-void TestResult::onError(std::string&& msg) {
-  errors.emplace_back(std::move(msg), false);
-}
- \end{c++}
-\end{leftbar}
-
-至此，测试通过。
-
-\subsection{实现统一}
-
-在\ascii{TestResult}中便可以删除既有的\ascii{errors}列表，及其相关的查询接口\ascii{getErrors}；统一使用\ascii{failures}一个缓存列表，及其\ascii{getFailures}一个查询接口。至此，消除了失败与错误两种重复表示，统一了接口的使用方式。
-
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{include/mars/core/TestResult.h}}]
+\begin{nodiff}{include/mars/core/TestResult.h}
+ \begin{c++}
 #include <string>
 #include <vector>
 #include <mars/except/TestFailure.h>
@@ -703,28 +546,208 @@ struct TestResult {
   int failCount() const;
   int errorCount() const;
 
+  bool protect(const TestCaseFunctor&);
+
   const std::vector<TestFailure>& getFailures() const;
+  const std::vector<std::string>& getErrors() const;
+
+private:
+  void addFailure(std::string&& msg);
+  void addError(std::string&& msg);
+
+private:
+  std::vector<TestFailure> failures;
+  std::vector<std::string> errors;
+};
+ \end{c++}
+\end{nodiff}
+
+在实现文件中，重构完成\ascii{TestFailure}的缓存。
+
+\begin{nodiff}{src/mars/core/TestResult.cc}
+ \begin{c++}
+#include <mars/core/TestResult.h>
+#include <mars/except/AssertionError.h>
+#include <mars/core/internal/TestCaseFunctor.h>
+
+const std::vector<TestFailure>& TestResult::getFailures() const {
+  return failures;
+}
+
+const std::vector<std::string>& TestResult::getErrors() const {
+  return errors;
+}
+
+inline void TestResult::addFailure(std::string&& msg) {
+  failures.emplace_back(std::move(msg), true);
+}
+
+inline void TestResult::addError(std::string&& msg) {
+  errors.emplace_back(std::move(msg));
+}
+
+bool TestResult::protect(const TestCaseFunctor& f) {
+  try {
+    return f();
+  } catch (const AssertionError& e) {
+    addFailure(std::string("assertion fail") + ' ' + f.where() + '\n' + e.what());
+  } catch (const std::exception& e) {
+    addError(std::string("uncaught std::exception") + ' ' + f.where() + '\n' + e.what());
+  } catch (...) {
+    addError(std::string("uncaught unknown exception") + " " + f.where() + "\n" + "");
+  }
+  return false;
+}
+ \end{c++}
+\end{nodiff}
+
+至此，测试通过。
+
+\subsection{错误}
+
+依葫芦画瓢，重构既有的测试用例，使其失败。
+
+\begin{nodiff}{test/mars/core/TestCaseSpec.cc}
+ \begin{c++}
+namespace {
+  struct ErrorOnRunningTest : TestCase {
+    const char* expectMsg() const {
+      return "uncaught std::exception in the runTest\n"
+             "std::exception";
+    }
+
+  private:
+    void runTest() override {
+      throw std::exception();
+    }
+  };
+}
+
+TEST_F(TestCaseSpec, extract_error_msgt_on_running_test_failed) {
+  ErrorOnRunningTest test;
+  run(test);
+
+  auto& errors = result.getErrors();
+  ASSERT_EQ(1, errors.size());
+
+  auto& error = errors[0];
+  ASSERT_FALSE(error.isFailure());
+  ASSERT_EQ(test.expectMsg(), error.getExceptionMsg());
+}
+\end{c++}
+\end{nodiff}
+
+\subsubsection{重构TestResult}
+
+将\code{errors}的元素类型\code{std::string}重构为\code{TestFailure}。
+
+\begin{nodiff}{include/mars/core/TestResult.h}
+ \begin{c++}
+#include <string>
+#include <vector>
+#include <mars/except/TestFailure.h>
+
+struct TestCaseFunctor;
+
+struct TestResult {
+  int failCount() const;
+  int errorCount() const;
 
   bool protect(const TestCaseFunctor&);
 
+  const std::vector<TestFailure>& getFailures() const;
+  const std::vector<TestFailure>& getErrors() const;
+
 private:
-  void onFail(std::string&& msg);
-  void onError(std::string&& msg);
+  void addFailure(std::string&& msg);
+  void addError(std::string&& msg);
+
+private:
+  std::vector<TestFailure> failures;
+  std::vector<TestFailure> errors;
+};
+ \end{c++}
+\end{nodiff}
+
+在实现文件中，重构完成\ascii{TestFailure}的构造与缓存。
+
+\begin{nodiff}{src/mars/core/TestResult.cc}
+ \begin{c++}
+#include <mars/core/TestResult.h>
+#include <mars/except/AssertionError.h>
+#include <mars/core/internal/TestCaseFunctor.h>
+
+const std::vector<TestFailure>& TestResult::getFailures() const {
+  return failures;
+}
+
+const std::vector<TestFailure>& TestResult::getErrors() const {
+  return errors;
+}
+
+inline void TestResult::addFailure(std::string&& msg) {
+  failures.emplace_back(std::move(msg), true);
+}
+
+inline void TestResult::addError(std::string&& msg) {
+  errors.emplace_back(std::move(msg), false);
+}
+
+bool TestResult::protect(const TestCaseFunctor& f) {
+  try {
+    return f();
+  } catch (const AssertionError& e) {
+    addFailure(std::string("assertion fail") + ' ' + f.where() + '\n' + e.what());
+  } catch (const std::exception& e) {
+    addError(std::string("uncaught std::exception") + ' ' + f.where() + '\n' + e.what());
+  } catch (...) {
+    addError(std::string("uncaught unknown exception") + " " + f.where() + "\n" + "");
+  }
+  return false;
+}
+ \end{c++}
+\end{nodiff}
+
+至此，测试通过。
+
+\subsection{统一接口}
+
+在\ascii{TestResult}中便可以删除既有的\ascii{errors}列表，及其相关的查询接口\ascii{getErrors}；统一使用\ascii{failures}一个缓存列表，及其\ascii{getFailures}一个查询接口。至此，消除了失败与错误两种重复表示，统一了接口的使用方式。
+
+\subsubsection{合二为一}
+
+\begin{nodiff}{include/mars/core/TestResult.h}
+ \begin{c++}
+#include <string>
+#include <vector>
+#include <mars/except/TestFailure.h>
+
+struct TestCaseFunctor;
+
+struct TestResult {
+  int failCount() const;
+  int errorCount() const;
+
+  bool protect(const TestCaseFunctor&);
+  const std::vector<TestFailure>& getFailures() const;
+
+private:
+  void addFailure(std::string&& msg);
+  void addError(std::string&& msg);
 
 private:
   std::vector<TestFailure> failures;
 };
  \end{c++}
-\end{leftbar}
+\end{nodiff}
 
-在实现文件中，替换所有\ascii{errors}为\ascii{failures}。
+在实现文件中，替换所有\ascii{errors}为\ascii{failures}，删除查询接口\ascii{getErrors}。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{src/mars/core/TestResult.cc}}]
-#include "mars/core/TestResult.h"
-#include "mars/core/internal/TestCaseFunctor.h"
-#include "mars/except/AssertionError.h"
-#include "mars/except/TestFailure.h"
+\begin{nodiff}{src/mars/core/TestResult.cc}
+ \begin{c++}
+#include <mars/core/TestResult.h>
+#include <mars/except/AssertionError.h>
+#include <mars/core/internal/TestCaseFunctor.h>
 
 // ...
 
@@ -732,63 +755,72 @@ const std::vector<TestFailure>& TestResult::getFailures() const {
   return failures;
 }
 
+inline void TestResult::addFailure(std::string&& msg) {
+  failures.emplace_back(std::move(msg), true);
+}
+
+inline void TestResult::addError(std::string&& msg) {
+  failures.emplace_back(std::move(msg), false);
+}
+
 bool TestResult::protect(const TestCaseFunctor& f) {
   try {
     return f();
   } catch (const AssertionError& e) {
-    onFail(std::string("assertion fail") + ' ' + f.where() + '\n' + e.what());
+    addFailure(std::string("assertion fail") + ' ' + f.where() + '\n' + e.what());
   } catch (const std::exception& e) {
-    onError(std::string("uncaught std::exception") + ' ' + f.where() + '\n' + e.what());
+    addError(std::string("uncaught std::exception") + ' ' + f.where() + '\n' + e.what());
   } catch (...) {
-    onError(std::string("uncaught unknown exception") + ' ' + f.where() + '\n' + "");
+    addError(std::string("uncaught unknown exception") + " " + f.where() + "\n" + "");
   }
   return false;
 }
-
-void TestResult::onFail(std::string&& msg) {
-  failures.emplace_back(std::move(msg), true);
-}
-
-void TestResult::onError(std::string&& msg) {
-  failures.emplace_back(std::move(msg), false);
-}
  \end{c++}
-\end{leftbar}
+\end{nodiff}
 
 \subsubsection{计数器实现}
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{src/mars/core/TestResult.cc}}]
-#include "mars/core/TestResult.h"
-#include "mars/except/TestFailure.h"
-
-// ...
-
-template <typename Pred>
-inline int TestResult::count(Pred pred) const {
-  return std::count_if(failures.begin(), failures.end(), pred);
-}
+\begin{nodiff}{src/mars/core/TestResult.cc}
+ \begin{c++}
+#include <mars/core/TestResult.h>
+#include <algorithm>
 
 int TestResult::failCount() const {
-  return count([](auto& e) {
-    return e.isFailure();
+  return std::count_if(failures.begin(), failures.end(), [](auto f) {
+    return f.isFailure();
   });
 }
 
 int TestResult::errorCount() const {
-  return count([](auto& e) {
-    return e.isError();
-  });
+  return failures.size() - failCount();
 }
- \end{c++}
-\end{leftbar}
 
-\subsection{工厂方法}
+// ...
+ \end{c++}
+\end{nodiff}
+
+\subsection{改善表达力}
+
+\subsubsection{工厂方法}
 
 创建异常信息的工厂方法\ascii{msg}，得到可复用的代码实现。
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{src/mars/core/TestResult.cc}}]
+\begin{nodiff}{src/mars/core/TestResult.cc}
+ \begin{c++}
+#include <mars/core/TestResult.h>
+#include <mars/except/AssertionError.h>
+#include <mars/core/internal/TestCaseFunctor.h>
+
+// ...
+
+inline void TestResult::addFailure(std::string&& msg) {
+  failures.emplace_back(std::move(msg), true);
+}
+
+inline void TestResult::addError(std::string&& msg) {
+  failures.emplace_back(std::move(msg), false);
+}
+
 namespace {
   std::string msg(const char* why, const char* where, const char* what) {
     return std::string(why) + ' ' + where + '\n' + what;
@@ -799,51 +831,51 @@ bool TestResult::protect(const TestCaseFunctor& f) {
   try {
     return f();
   } catch (const AssertionError& e) {
-    onFail(msg("assertion fail", f.where(), e.what()));
+    addFailure(msg("assertion fail", f.where(), e.what()));
   } catch (const std::exception& e) {
-    onError(msg("assertion fail", f.where(), e.what()));
+    addError(msg("uncaught std::exception", f.where(), e.what()));
   } catch (...) {
-    onError(msg("assertion fail", f.where(), ""));
+    addError(msg("uncaught unknown exception", f.where(), ""));
   }
   return false;
 }
-
-void TestResult::onFail(std::string&& msg) {
-  failures.emplace_back(std::move(msg), true);
-}
-
-void TestResult::onError(std::string&& msg) {
-  failures.emplace_back(std::move(msg), false);
-}
  \end{c++}
-\end{leftbar}
+\end{nodiff}
 
-\subsection{实用宏}
+\subsubsection{实用宏}
 
-\begin{leftbar}
- \begin{c++}[caption={\ttfamily{src/mars/core/TestResult.cc}}]
-inline void TestResult::onFail(std::string&& msg) {
+为了统一各种异常类型的处理逻辑，构造\ascii{UnknownException}的辅助类，及其该类型的异常对象。当使用通配符捕获所有异常时，当调用\code{e.what()}时，根据作用域的名字查找规则，自动找到该常对象，并返回空字符串。
+
+\begin{nodiff}{src/mars/core/TestResult.cc}
+ \begin{c++}
+#include <mars/core/TestResult.h>
+#include <mars/except/AssertionError.h>
+#include <mars/core/internal/TestCaseFunctor.h>
+
+// ...
+
+inline void TestResult::addFailure(std::string&& msg) {
   failures.emplace_back(std::move(msg), true);
 }
 
-inline void TestResult::onError(std::string&& msg) {
+inline void TestResult::addError(std::string&& msg) {
   failures.emplace_back(std::move(msg), false);
 }
 
 namespace {
-  struct NilException {
-    const char* what() const {
-      return "";
-    }
-  };
-
   inline std::string msg(const char* why, const char* where, const char* what) {
     return std::string(why) + ' ' + where + '\n' + what;
   }
+
+  struct UnknownException {
+    const char* what() const {
+      return "";
+    }
+  } const e;
 }
 
-#define ON_FAIL(except)  onFail(msg(except, f.where(), e.what()))
-#define ON_ERROR(except) onError(msg(except, f.where(), e.what()))
+#define ON_FAIL(except)  addFailure(msg(except, f.where(), e.what()))
+#define ON_ERROR(except) addError(msg(except, f.where(), e.what()))
 
 bool TestResult::protect(const TestCaseFunctor& f) {
   try {
@@ -853,12 +885,13 @@ bool TestResult::protect(const TestCaseFunctor& f) {
   } catch (const std::exception& e) {
     ON_ERROR("uncaught std::exception");
   } catch (...) {
-    NilException e;
     ON_ERROR("uncaught unknown exception");
   }
   return false;
 }
  \end{c++}
-\end{leftbar}
+\end{nodiff}
+
+至此，异常处理逻辑已经明晰，消除了所有的重复代码。
 
 \end{content}
