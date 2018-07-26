@@ -283,7 +283,7 @@ private:
 
 为了遵循迪米特法则，重构\ascii{TestCase::run}的实现逻辑，使其调用公开给\ascii{TestCase}的唯一接口\ascii{TestResult::runTestCase}，实现了\ascii{TestResult}封装内部广播事件等实现细节。
 
-最为关键的是，在\ascii{TestCase::run}实现中，传递\ascii{this}所指的当前对象至\ascii{TestResult::runTestCase(BareTestCase\&)}成员函数。因为\ascii{TestCase}私有继承自\ascii{BareTestCase}，在\ascii{TestCase}类域中，\code{this}所指的当前对象是\ascii{BareTestCase}合法的\emph{私生子}。
+最为关键的是，在\ascii{TestCase::run}实现中，传递\ascii{this}所指的当前对象至\ascii{TestResult::runTest\\-Case(BareTestCase\&)}成员函数。因为\ascii{TestCase}私有继承自\ascii{BareTestCase}，在\ascii{TestCase}类域中，\ascii{this}所指的当前对象是\ascii{BareTestCase}合法的\emph{私生子}。
 
 \begin{nodiff}{include/mars/core/TestCase.cc}
  \begin{c++}
@@ -437,7 +437,7 @@ private:
  \end{c++}
 \end{nodiff}
 
-在\ascii{TestSuite::run}实现中，传递\ascii{this}所指的当前对象至\ascii{TestResult::runTestSuite(BareTestSuite\&)}。因为\ascii{TestSuite}私有继承自\ascii{BareTestSuite}，在\ascii{TestSuite}类域中，\code{this}所指的当前对象是\ascii{BareTestSuite}合法的\emph{私生子}。
+在\ascii{TestSuite::run}实现中，传递\ascii{this}所指的当前对象至\ascii{TestResult::runTestSuite(BareTest\\-Suite\&)}。因为\ascii{TestSuite}私有继承自\ascii{BareTestSuite}，在\ascii{TestSuite}类域中，\code{this}所指的当前对象是\ascii{BareTestSuite}合法的\emph{私生子}。
 
 \begin{nodiff}{include/mars/core/TestSuite.cc}
  \begin{c++}
