@@ -146,7 +146,7 @@ void TestResult::addListener(TestListener& listener) {
  \end{c++}
 \end{nodiff}
 
-\subsubsection{广播监听器}
+\subsubsection{广播事件}
 
 在\ascii{TestResult.h}中，增加事件监听接口\ascii{startTestCase}。
 
@@ -190,7 +190,7 @@ void TestResult::startTestCase(const Test& test) {
  \end{c++}
 \end{nodiff}
 
-\subsubsection{通知监听器}
+\subsubsection{通知事件}
 
 在\ascii{TestCase::run}实现中，调用\ascii{startTestCase}通知\ascii{TestResult}，测试用例已开始执行。
 
@@ -312,7 +312,7 @@ void TestCollector::addFailure(const TestFailure&) {
  \end{c++}
 \end{nodiff}
 
-\subsubsection{广播监听器}
+\subsubsection{广播事件}
 
 当执行\ascii{addFailure, addError}时，广播给所有的监听者执行相关逻辑。显而易见，此处存在明显的重复设计。
 
@@ -582,7 +582,7 @@ void TestCollector::addFailure(const TestFailure& f) {
  \end{c++}
 \end{nodiff}
 
-\subsubsection{广播监听器}
+\subsubsection{广播事件}
 
 在\ascii{TestResult}中，增加\ascii{endTestCase}事件监听接口，它广播所有监听器该事件的到达消息。
 
@@ -625,7 +625,7 @@ namespace {
  \end{c++}
 \end{nodiff}
 
-\subsubsection{通知监听器}
+\subsubsection{通知事件}
 
 在\ascii{TestCase::run}实现中，追加实现\ascii{TestResult::endTestCase}事件的通知消息。
 
@@ -936,7 +936,9 @@ namespace {
     }
 
     void run(::Test& test) {
-      result.runRootTest(test);
+      result.startTestRun(test);
+      test.run(result);
+      result.endTestRun(test);
     }
 
     void assertOutput(const char* output) {
@@ -1001,14 +1003,15 @@ struct TestListener {
  \begin{c++}
 #include <mars/core/TestResult.h>
 #include <mars/core/TestListener.h>
-#include <mars/core/Test.h>
 
 #define BOARDCAST(action) \
   for (auto listener : listeners) listener->action
 
-void TestResult::runRootTest(Test& test) {
+void TestResult::startTestRun(const Test& test) {
   BOARDCAST(startTestRun(test));
-  test.run(*this);
+}
+
+void TestResult::endTestRun(const Test& test) {
   BOARDCAST(endTestRun(test));
 }
  \end{c++}
@@ -1194,6 +1197,312 @@ void TextProgress::addFailure(const TestFailure& f) {
 \end{nodiff}
 
 测试通过。
+
+\end{content}
+
+\section{时间统计器}
+
+\begin{content}
+
+\subsection{时间测试}
+
+\begin{nodiff}{test/mars/listener/collector/TimeCollectorSpec.cc}
+ \begin{c++}
+#include <mars/listener/collector/TimeCollector.h>
+#include <mars/core/TestResult.h>
+#include <mars/core/TestCase.h>
+#include <mars/core/TestSuite.h>
+#include <gtest/gtest.h>
+
+namespace {
+  struct TimeCollectorSpec : testing::Test {
+  protected:
+    TimeCollectorSpec() {
+      result.addListener(clock);
+    }
+
+    void run(::Test& test) {
+      result.startTestRun(test);
+      test.run(result);
+      result.endTestRun(test);
+    }
+
+    void assertTime(const TimeVal& val) {
+      timeval max{0, 100};  // 100 us
+      ASSERT_LT(val, TimeVal::by(max));
+    }
+
+  protected:
+    TestResult result;
+    TimeCollector clock;
+  };
+}
+
+TEST_F(TimeCollectorSpec, should_be_successful) {
+  TestSuite suite;
+  suite.add(new TestCase);
+
+  run(suite);
+
+  assertTime(clock.caseTime());
+  assertTime(clock.suiteTime());
+  assertTime(clock.totalTime());
+}
+ \end{c++}
+\end{nodiff}
+
+\subsection{实现统计器}
+
+\begin{nodiff}{include/mars/listener/collector/TimeCollector.h}
+ \begin{c++}
+#include <mars/core/TestListener.h>
+#include <mars/util/TimeVal.h>
+#include <stack>
+
+struct TimeCollector : TestListener {
+  ~TimeCollector();
+
+  TimeVal caseTime() const;
+  TimeVal suiteTime() const;
+  TimeVal totalTime() const;
+
+private:
+  void startTestRun(const Test&) override;
+  void endTestRun(const Test&) override;
+
+  void startTestSuite(const Test&) override;
+  void endTestSuite(const Test&) override;
+
+  void startTestCase(const Test&) override;
+  void endTestCase(const Test&) override;
+
+private:
+  void start();
+  void end(TimeVal&);
+  void pop();
+
+private:
+  TimeVal casetime;
+  TimeVal suitetime;
+  TimeVal totaltime;
+
+  struct Timer;
+  std::stack<Timer*> stack;
+};
+ \end{c++}
+\end{nodiff}
+
+\subsubsection{计时器}
+
+\begin{nodiff}{src/mars/listener/collector/TimeCollector.cc}
+ \begin{c++}
+struct TimeCollector::Timer {
+  Timer() {
+    start.now();
+  }
+
+  void elapsed(TimeVal& last) const {
+    last.now();
+    last -= start;
+  }
+
+private:
+  TimeVal start;
+};
+ \end{c++}
+\end{nodiff}
+
+\subsubsection{时间值}
+
+\begin{nodiff}{include/mars/util/TimeVal.h}
+ \begin{c++}
+#include <time.h>
+#include <mars/util/StructWrapper.h>
+
+STRUCT_WRAPPER(TimeVal, timeval) {
+  TimeVal();
+  void now();
+
+  bool operator<(const TimeVal&) const;
+  TimeVal& operator-=(const TimeVal&);
+};
+ \end{c++}
+\end{nodiff}
+
+\begin{nodiff}{src/mars/util/TimeVal.cc}
+ \begin{c++}
+#include <mars/util/TimeVal.h>
+#include <sys/time.h>
+
+TimeVal::TimeVal() {
+  tv_sec  = 0;
+  tv_usec = 0;
+}
+
+void TimeVal::now() {
+  gettimeofday(this, 0);
+}
+
+bool TimeVal::operator<(const TimeVal& rhs) const {
+  if (tv_sec < rhs.tv_sec) return true;
+  if (rhs.tv_sec < tv_sec) return false;
+  return tv_usec < rhs.tv_usec;
+}
+
+TimeVal& TimeVal::operator-=(const TimeVal& start) {
+  while (tv_usec < start.tv_usec) {
+    tv_usec += 1000000;
+    tv_sec--;
+  }
+  tv_usec -= start.tv_usec;
+  tv_sec  -= start.tv_sec;
+  return *this;
+}
+ \end{c++}
+\end{nodiff}
+
+\subsubsection{实用宏}
+
+\begin{nodiff}{include/mars/util/StructWrapper.h}
+ \begin{c++}
+template<typename From, typename To>
+struct StructWrapper : protected From {
+  static const To& by(const From& from) {
+    static_assert(sizeof(From) == sizeof(To), "");
+    return (const To&) from;
+  }
+
+  static To& by(From& from) {
+    static_assert(sizeof(From) == sizeof(To), "");
+    return (To&) from;
+  }
+};
+
+#define STRUCT_WRAPPER(To, From) \
+  struct To : StructWrapper<From, To>
+ \end{c++}
+\end{nodiff}
+
+\subsubsection{统计时间}
+
+\begin{nodiff}{src/mars/listener/collector/TimeCollector.cc}
+ \begin{c++}
+inline void TimeCollector::start() {
+  stack.push(new Timer);
+}
+
+inline void TimeCollector::pop() {
+  auto top = stack.top();
+  stack.pop();
+  delete top;
+}
+
+inline void TimeCollector::end(TimeVal& val) {
+  stack.top()->elapsed(val);
+  pop();
+}
+
+TimeCollector::~TimeCollector() {
+  while (!stack.empty()) {
+    pop();
+  }
+}
+
+void TimeCollector::startTestRun(const Test&) {
+  start();
+}
+
+void TimeCollector::endTestRun(const Test&) {
+  end(totaltime);
+}
+
+void TimeCollector::startTestSuite(const Test&) {
+  start();
+}
+
+void TimeCollector::endTestSuite(const Test&) {
+  end(suitetime);
+}
+
+void TimeCollector::startTestCase(const Test&) {
+  start();
+}
+
+void TimeCollector::endTestCase(const Test&) {
+  end(totaltime);
+}
+ \end{c++}
+\end{nodiff}
+
+\subsubsection{查询接口}
+
+\begin{nodiff}{src/mars/listener/collector/TimeCollector.cc}
+ \begin{c++}
+TimeVal TimeCollector::caseTime() const {
+  return casetime;
+}
+
+TimeVal TimeCollector::suiteTime() const {
+  return suitetime;
+}
+
+TimeVal TimeCollector::totalTime() const {
+  return totaltime;
+}
+ \end{c++}
+\end{nodiff}
+
+\subsubsection{广播事件}
+
+\begin{nodiff}{src/mars/core/TestResult.cc}
+ \begin{c++}
+#include <mars/core/TestResult.h>
+#include <mars/core/TestListener.h>
+
+#define BOARDCAST(action) \
+  for (auto listener : listeners) listener->action
+
+void TestResult::startTestSuite(const Test& test) {
+  BOARDCAST(startTestSuite(test));
+}
+
+void TestResult::endTestSuite(const Test& test) {
+  BOARDCAST(endTestSuite(test));
+}
+
+// ...
+ \end{c++}
+\end{nodiff}
+
+\subsubsection{通知事件}
+
+\begin{nodiff}{src/mars/core/TestSuite.cc}
+ \begin{c++}
+#include <mars/core/TestSuite.h>
+#include <mars/core/TestResult.h>
+
+template <typename F>
+inline void TestSuite::foreach(F f) const {
+  for (auto test : tests) {
+    f(test);
+  }
+}
+
+void TestSuite::runBare(TestResult& result) {
+  foreach([&result](auto test) {
+    test->run(result);
+  });
+}
+
+void TestSuite::run(TestResult& result) {
+  result.startTestSuite(*this);
+  runBare(result);
+  result.endTestSuite(*this);
+}
+
+// ...
+ \end{c++}
+\end{nodiff}
 
 \end{content}
 
