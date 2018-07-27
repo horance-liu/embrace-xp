@@ -431,6 +431,35 @@ void TestCase::run(TestResult& result) {
  \end{minicpp}
 \end{diff}
 
+\subsection{重构回顾}
+
+在重构之前，在\ascii{TestCase}中实现异常处理逻辑\ascii{TestCase::protect}。但是，当捕获异常之后，需要调用两个公开的\ascii{TestResult::addFailure, TestResult::addError}，缓存异常信息到\ascii{TestResult}本地。导致\ascii{TestCase::protect}的实现，严重依赖于\ascii{TestResult}缓存异常信息的具体实现。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=1.0\textwidth]{figures/xunit/coupling-1.png}
+\caption{重构之前}
+ \label{fig:coupling-1}
+\end{figure}
+
+根据迪米特法则，将\ascii{TestCase::protect}搬迁至\ascii{TestResult::protect}。一方面，\ascii{TestResult}暴露给\ascii{TestCase}接口由\ascii{2}减少至\ascii{1}，缓解了\ascii{TestCase}对\ascii{TestResult}的耦合关系。另一方面，实现\ascii{TestResult::addFailure, TestResult::addError}的私有化，使得\ascii{TestResult}取得更好的封装特性。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=1.0\textwidth]{figures/xunit/decoupling-1-1.png}
+\caption{重构之后}
+ \label{fig:decoupling-1-1}
+\end{figure}
+
+解耦的关键在于抽象接口\ascii{TestCaseFunctor}。在没有破坏\ascii{TestCase}既有封装特性的前提下,使得\ascii{TestResult::protect}不再依赖于具体的\ascii{TestCase::setup, TestCase::runTest, TestCase::tearDown}。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=1.0\textwidth]{figures/xunit/test-case-functor-1.png}
+\caption{关键抽象: TestCaseFunctor}
+ \label{fig:test-case-functor-1}
+\end{figure}
+
 \end{content}
 
 % \section{彻底解耦}

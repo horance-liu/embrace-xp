@@ -1,0 +1,502 @@
+\begin{savequote}[45mm]
+\ascii{Any fool can write code that a computer can understand. Good programmers write code that humans can understand.}
+\qauthor{\ascii{- Martin Flower}}
+\end{savequote}
+
+\chapter{自动发现} 
+\label{ch:auto-register}
+
+\begin{content}
+
+\end{content}
+
+% 太古代、元古代、古生代、中生代和新生代.
+
+\section{太古代}
+
+\begin{content}
+
+\subsection{xUnit Mars用例}
+
+\begin{nodiff}{test/mars/auto/StackSpec.cc}
+ \begin{c++}
+#include <mars/core/TestFixture.h>
+#include <stack>
+
+namespace {
+  struct StackSpec : TestFixture {
+    std::stack<int> v;
+
+    void setUp() override {
+      v.push(1);
+      v.push(2);
+    }
+
+    void apply_pop_0_time() {
+      ASSERT_EQ(2, v.top());
+    }
+
+    void apply_pop_1_time() {
+      v.pop();
+      ASSERT_EQ(1, v.top());
+    }
+
+    void apply_pop_2_times() {
+      v.pop();
+      v.pop();
+      ASSERT_TRUE(v.empty());
+    }
+  };
+}
+ \end{c++}
+\end{nodiff}
+
+\subsection{手动注册}
+
+\begin{nodiff}{test/mars/auto/StackSpec.cc}
+ \begin{c++}
+#include <gtest/gtest.h>
+#include <mars/core/TestMethod.h>
+#include <mars/core/TestSuite.h>
+#include <mars/core/TestResult.h>
+#include <mars/listener/text/TextProgress.h>
+
+namespace {
+  struct ManualRegisterSpec : testing::Test {
+  protected:
+    ManualRegisterSpec() : progress(ss) {
+      result.addListener(progress);
+    }
+
+    void run(::Test& test) {
+      result.runRootTest(test);
+    }
+
+    void assertOutput(const char* output) {
+      ASSERT_EQ(ss.str(), output);
+    }
+
+  protected:
+    std::ostringstream ss;
+    TestResult result;
+    TextProgress progress;
+  };
+}
+
+TEST_F(ManualRegisterSpec, manually_registering_test_cases) {
+  TestSuite suite("StackSpec");
+  suite.add(new TestMethod<StackSpec>(&StackSpec::apply_pop_0_time));
+  suite.add(new TestMethod<StackSpec>(&StackSpec::apply_pop_1_time));
+  suite.add(new TestMethod<StackSpec>(&StackSpec::apply_pop_2_times));
+
+  run(suite);
+  assertOutput("starting...\n***\nend.\n");
+}
+ \end{c++}
+\end{nodiff}
+
+\end{content}
+
+\section{元古代}
+
+\begin{content}
+
+\subsection{手动创建}
+
+\begin{nodiff}{test/mars/auto/StackSpec.cc}
+ \begin{c++}
+namespace {
+  struct ManualRegisterSpec : testing::Test {
+  protected:
+    ManualRegisterSpec() : progress(ss), test(suite()) {
+      result.addListener(progress);
+    }
+
+    ~ManualRegisterSpec() {
+      delete test;
+    }
+
+    void assertOutput(const char* output) {
+      ASSERT_EQ(ss.str(), output);
+    }
+
+  private:
+    static ::Test* suite() {
+      static StackSpec dummy;
+      return REGISTRY(StackSpec).suite();
+    }
+
+  protected:
+    std::ostringstream ss;
+    TestResult result;
+    TextProgress progress;
+    ::Test* test;
+  };
+}
+
+TEST_F(ManualRegisterSpec, manually_registering_test_cases) {
+  result.runRootTest(*test);
+  assertOutput("starting...\n***\nend.\n");
+}
+ \end{c++}
+\end{nodiff}
+
+\subsection{代码注入}
+
+\begin{nodiff}{test/mars/auto/StackSpec.cc}
+ \begin{c++}
+#include <mars/core/TestFixture.h>
+#include <mars/auto/AutoTestMethod.h>
+#include <stack>
+
+namespace {
+  struct StackSpec : TestFixture {
+    std::stack<int> v;
+
+    void setUp() override {
+      v.push(1);
+      v.push(2);
+    }
+
+    void apply_pop_0_time() {
+      ASSERT_EQ(2, v.top());
+    }
+
+    AutoTestMethod m1{1, "apply_pop_0_time", &StackSpec::apply_pop_0_time};
+
+    void apply_pop_1_time() {
+      v.pop();
+      ASSERT_EQ(1, v.top());
+    }
+
+    AutoTestMethod m2{2, "apply_pop_1_time", &StackSpec::apply_pop_1_time};
+
+    void apply_pop_2_times() {
+      v.pop();
+      v.pop();
+      ASSERT_TRUE(v.empty());
+    }
+
+    AutoTestMethod m3{3, "apply_pop_0_time", &StackSpec::apply_pop_2_times};
+  };
+}
+ \end{c++}
+\end{nodiff}
+
+\subsection{自动注册}
+
+\begin{nodiff}{include/mars/auto/AutoTestMethod.h}
+ \begin{c++}
+#include <mars/core/TestMethod.h>
+
+struct AutoTestMethod {
+  template <typename Fixture>
+  AutoTestMethod(int id, const char* name, void(Fixture::*method)()) {
+    REGISTRY(Fixture).put(id, new TestMethod<Fixture>(method, name));
+  }
+};
+ \end{c++}
+\end{nodiff}
+
+\subsection{仓库实现}
+
+\begin{nodiff}{include/mars/auto/TestMethodRegistry.h}
+ \begin{c++}
+template<typename Fixture>
+GENERIC_SINGLETON(TestMethodRegistry, Fixture) {
+  void put(int id, Test* test) {
+    if (!exist(id)) {
+      registry.emplace(id, test);
+    }
+  }
+
+  Test* suite() const {
+    auto suite = new TestSuite();
+    for (auto& test : registry) {
+      suite->add(test.second);
+    }
+    return suite;
+  }
+
+private:
+  bool exist(int id) const {
+    return registry.find(id) != registry.end();
+  }
+
+private:
+  std::map<int, Test*> registry;
+};
+
+#define REGISTRY(fixture) TestMethodRegistry<fixture>::instance()
+ \end{c++}
+\end{nodiff}
+
+\subsubsection{实用宏：单例}
+
+\begin{nodiff}{include/mars/util/Singleton.h}
+ \begin{c++}
+template<typename T>
+struct Singleton {
+  static T& instance() {
+    static T inst;
+    return inst;
+  }
+
+protected:
+  Singleton() {}
+};
+
+#define SINGLETON(type) \
+  struct type : Singleton<type>
+
+#define GENERIC_SINGLETON(type, ...) \
+  struct type : Singleton<type<__VA_ARGS__>>
+ \end{c++}
+\end{nodiff}
+
+\end{content}
+
+\section{古生代}
+
+\begin{content}
+
+\subsection{手动创建}
+
+\begin{nodiff}{test/mars/auto/StackSpec.cc}
+ \begin{c++}
+namespace {
+  struct ManualRegisterSpec : testing::Test {
+  protected:
+    ManualRegisterSpec() : progress(ss), test(suite()) {
+      result.addListener(progress);
+    }
+
+    ~ManualRegisterSpec() {
+      delete test;
+    }
+
+    void assertOutput(const char* output) {
+      ASSERT_EQ(ss.str(), output);
+    }
+
+  private:
+    static ::Test* suite() {
+      TestFactory& factory = TestFactorySuite::instance();
+      return factory.make();
+    }
+
+  protected:
+    std::ostringstream ss;
+    TestResult result;
+    TextProgress progress;
+    ::Test* test;
+  };
+}
+
+TEST_F(ManualRegisterSpec, manually_registering_test_cases) {
+  result.runRootTest(*test);
+  assertOutput("starting...\n***\nend.\n");
+}
+ \end{c++}
+\end{nodiff}
+
+\subsection{代码注入}
+
+\begin{nodiff}{test/mars/auto/StackSpec.cc}
+ \begin{c++}
+#include <mars/core/TestFixture.h>
+#include <mars/auto/AutoTestMethod.h>
+#include <mars/auto/AutoTestSuite.h>
+#include <stack>
+
+namespace {
+  struct StackSpec;
+  static AutoTestSuite<StackSpec> suite1;
+
+  struct StackSpec : TestFixture {
+    std::stack<int> v;
+
+    void setUp() override {
+      v.push(1);
+      v.push(2);
+    }
+
+    void test1() {
+      ASSERT_EQ(2, v.top());
+    }
+
+    AutoTestMethod m1{1, "apply pop 0 time", &StackSpec::test1};
+
+    void test2() {
+      v.pop();
+      ASSERT_EQ(1, v.top());
+    }
+
+    AutoTestMethod m2{2, "apply pop 1 time", &StackSpec::test2};
+
+    void test3() {
+      v.pop();
+      v.pop();
+      ASSERT_TRUE(v.empty());
+    }
+
+    AutoTestMethod m3{3, "apply pop 2 times", &StackSpec::test3};
+  };
+}
+ \end{c++}
+\end{nodiff}
+
+\subsection{自动注册}
+
+\begin{nodiff}{include/mars/auto/AutoTestMethod.h}
+ \begin{c++}
+template<typename Fixture>
+struct AutoTestSuite {
+  AutoTestSuite() {
+    TestFactorySuite::instance().addFactory(factory);
+  }
+
+private:
+  AutoTestFactory<Fixture> factory;
+};
+ \end{c++}
+\end{nodiff}
+
+\subsection{用例工厂}
+
+\begin{nodiff}{include/mars/auto/TestMethodRegistry.h}
+ \begin{c++}
+struct TestFactory {
+  virtual Test* make() = 0;
+  virtual ~TestFactory() {}
+};
+ \end{c++}
+\end{nodiff}
+
+\begin{nodiff}{include/mars/auto/TestMethodRegistry.h}
+ \begin{c++}
+struct TestFactory {
+template<typename Fixture>
+struct AutoTestFactory : TestFactory {
+  Test* make() {
+    // register all test methods to TestMethodRegistry.
+    static Fixture dummy;
+    return TestMethodRegistry<Fixture>::instance().suite();
+  }
+};
+ \end{c++}
+\end{nodiff}
+
+\begin{nodiff}{include/mars/auto/TestMethodRegistry.h}
+ \begin{c++}
+SINGLETON(TestFactorySuite) EXTENDS(TestFactory) {
+  void addFactory(TestFactory& f) {
+    factories.push_back(&f);
+  }
+
+private:
+  Test* make() override {
+    auto suite = new TestSuite("All Tests");
+    for (auto factory : factories) {
+      suite->add(factory->make());
+    }
+    return suite;
+  }
+
+private:
+  std::vector<TestFactory*> factories;
+};
+ \end{c++}
+\end{nodiff}
+
+\end{content}
+
+\section{中生代}
+
+\begin{content}
+
+\subsection{代码注入}
+
+\begin{nodiff}{test/mars/auto/StackSpec.cc}
+ \begin{c++}
+#include <mars/mars.h>
+#include <stack>
+
+namespace {
+  FIXTURE(StackSpec) {
+    std::stack<int> v;
+
+    SETUP {
+      v.push(1);
+      v.push(2);
+    }
+
+    TEST("apply pop 0 time") {
+      ASSERT_EQ(2, v.top());
+    }
+
+    TEST("apply pop 1 time") {
+      v.pop();
+      ASSERT_EQ(1, v.top());
+    }
+
+    TEST("apply pop 2 times") {
+      v.pop();
+      v.pop();
+      ASSERT_TRUE(v.empty());
+    }
+  };
+}
+ \end{c++}
+\end{nodiff}
+
+\subsection{DSL: 领域描述语言}
+
+\begin{nodiff}{include/mars/dsl/FixtureDef.h}
+ \begin{c++}
+#include <mars/auto/AutoTestSuite.h>
+#include <mars/core/TestFixture.h>
+#include <mars/utils/Symbol.h>
+
+#define DEF_FIXTURE(fixture, super)                          \
+struct fixture;                                              \
+static AutoTestSuite<fixture> UNIQUE_NAME(auto_suite);  \
+struct fixture : super
+
+#define FIXTURE(fixture)  DEF_FIXTURE(fixture, TestFixture)
+
+#define SETUP    void setUp override
+#define TEARDOWN void tearDown() override
+
+#define SUPER_SETUP(super)    super::setUp()
+#define SUPER_TEARDOWN(super) super::tearDown()
+ \end{c++}
+\end{nodiff}
+
+\begin{nodiff}{include/mars/dsl/TestDef.h}
+ \begin{c++}
+#include <cui/utils/__Symbol__.h>
+#include <cut/auto/TestMethodTraits.h>
+#include <type_traits>
+
+////////////////////////////////////////////////////////////////////////////////
+#define __TEST_NAME(id)     __JOIN__(test_, id)
+#define __TEST___TRAIT__S(id)   __JOIN__(test_traits_, id)
+#define __TEST_REGISTER(id) __JOIN__(register_test_, id)
+
+////////////////////////////////////////////////////////////////////////////////
+#define __DEF_TEST(id, name)                                          \
+private:                                                              \
+AutoTestMethod __TEST___TRAIT__S(id) = __TEST_REGISTER(id)(); \
+public:                                                               \
+void __TEST_NAME(id)()
+
+AutoTestMethod m1{1, "apply pop 0 time", &StackSpec::test1};
+
+////////////////////////////////////////////////////////////////////////////////
+#define TEST(name) __DEF_TEST(UNIQUE_ID, name)
+
+ \end{c++}
+\end{nodiff}
+
+\end{content}
