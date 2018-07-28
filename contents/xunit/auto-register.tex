@@ -161,9 +161,7 @@ namespace {
     }
 
   private:
-    static ::Test* suite() {
-      return TestMethodRegistry<StackSpec>::instance().suite();
-    }
+    static ::Test* suite();
 
   protected:
     std::ostringstream ss;
@@ -171,6 +169,10 @@ namespace {
     TextProgress progress;
     ::Test* root;
   };
+  
+  ::Test* AutoStackSpec::suite() {
+    return TestMethodRegistry<StackSpec>::instance().suite();
+  }
 }
 
 TEST_F(AutoStackSpec, run_stack_spec) {
@@ -179,6 +181,8 @@ TEST_F(AutoStackSpec, run_stack_spec) {
 }
  \end{c++}
 \end{nodiff}
+
+为了篇幅所限，后文仅展示\ascii{AutoStackSpec::suite}的重构效果，\ascii{AutoStackSpec}的整体逻辑不再详细罗列，请自行在此查阅上下文。
 
 \subsection{空仓库}
 
@@ -366,10 +370,14 @@ namespace {
  \end{c++}
 \end{nodiff}
 
-但是，当增加另外一个用例组，例如\ascii{QueueSpec}。
+当增加另外一组用例时，例如\ascii{QueueSpec}。
 
-\begin{nodiff}{test/mars/auto/StackSpec.cc}
+\begin{nodiff}{test/mars/auto/QueueSpec.cc}
  \begin{c++}
+#include <mars/core/TestFixture.h>
+#include <mars/auto/AutoTestMethod.h>
+#include <queue>
+
 namespace {
   struct QueueSpec : TestFixture {
     std::queue<int> q;
@@ -441,7 +449,7 @@ struct AutoTestFactory {
 
 \subsubsection{复合工厂}
 
-最终，不会将\ascii{AutoStackSpec, AutoQueueSpec}分离运行，而应该对它们实施统一的打包，一并运行。
+为了消除\ascii{AutoStackSpec, AutoQueueSpec}之间的重复逻辑，将\ascii{StackSpec}与\ascii{QueueSpec}统一打包，一并运行。
 
 \begin{nodiff}{test/mars/auto/AutoRegisterSpec.cc}
  \begin{c++}
@@ -459,7 +467,7 @@ struct AutoTestFactory {
 
 基于上述观察，提取关键抽象\ascii{TestFactory}。
 
-\begin{nodiff}{include/mars/auto/TestFactory.cc}
+\begin{nodiff}{include/mars/auto/TestFactory.h}
  \begin{c++}
 struct Test;
 
@@ -478,12 +486,7 @@ struct TestFactory {
 #include <vector>
 
 struct TestFactorySuite : TestFactory {
-  ~TestFactorySuite();
-  void addFactory(TestFactory*);
-
-private:
-  template <typename F>
-  void foreach(F f) const;
+  void addFactory(TestFactory&);
 
 private:
   Test* make() override;
@@ -499,28 +502,15 @@ private:
 #include <mars/auto/TestFactorySuite.h>
 #include <mars/core/TestSuite.h>
 
-template <typename F>
-void TestFactorySuite::foreach(F f) const {
-  for (auto factory : factories) {
-    f(factory);
-  }
-}
-
-TestFactorySuite::~TestFactorySuite() {
-  foreach([](auto f){
-    delete f;
-  });
-}
-
-void TestFactorySuite::addFactory(TestFactory* f) {
-  factories.push_back(f);
+void TestFactorySuite::addFactory(TestFactory& f) {
+  factories.push_back(&f);
 }
 
 Test* TestFactorySuite::make() {
   auto suite = new TestSuite("All Tests");
-  foreach([suite](auto f){
+  for (auto f : factories) {
     suite->add(f->make());
-  });
+  }
   return suite;
 }
  \end{c++}
@@ -528,7 +518,7 @@ Test* TestFactorySuite::make() {
 
 此时，重构原子工厂\ascii{AutoTestFactory}，使其继承自\ascii{TestFactory}。
 
-\begin{nodiff}{test/mars/auto/QueueSpec.cc}
+\begin{nodiff}{include/mars/auto/AutoTestFactory.h}
  \begin{c++}
 #include <mars/auto/TestFactory.h> 
 #include <mars/auto/TestMethodRegistry.h>
@@ -544,28 +534,29 @@ private:
  \end{c++}
 \end{nodiff}
 
-\subsubsection{手动创建}
+\subsubsection{手动组建}
 
 基于\ascii{TestFactory}的抽象，消除了\ascii{AutoTestFactory, TestFactorySuite}之间的一多之分。
 
 \begin{nodiff}{test/mars/auto/AutoRegisterSpec.cc}
  \begin{c++}
-TestFactory& AutoRegisterSpec::composite(TestFactorySuite& suite) {
-  suite.addFactory(new AutoTestFactory<StackSpec>);
-  suite.addFactory(new AutoTestFactory<QueueSpec>);
-  return suite;
-}
-
 ::Test* AutoRegisterSpec::suite() {
-  TestFactorySuite factory;
-  return composite(factory).make();
+  TestFactorySuite multi;
+  AutoTestFactory<StackSpec> f1;
+  AutoTestFactory<QueueSpec> f2;
+
+  multi.addFactory(f1);
+  multi.addFactory(f2);
+
+  TestFactory& factory = multi;
+  return factory.make();
 }
  \end{c++}
 \end{nodiff}
 
-\subsection{自动创建}
+\subsection{自动组建}
 
-但是，组建工厂树的逻辑相当讨厌，需要实现自动注册的机制，自动发现\ascii{StackSpec, QueeuSpec}，并逐一注册，减轻用户的负担。
+但是，组建工厂树的逻辑相当讨厌，需要实现自动注册的机制，自动发现\ascii{StackSpec, QueeuSpec}对应的\ascii{AutoTestFactory}，并逐一注册，减轻用户的负担。
 
 \begin{nodiff}{test/mars/auto/AutoRegisterSpec.cc}
  \begin{c++}
@@ -576,7 +567,7 @@ TestFactory& AutoRegisterSpec::composite(TestFactorySuite& suite) {
  \end{c++}
 \end{nodiff}
 
-\subsubsection{单例：TestFactorySuite}
+\subsubsection{工厂仓库}
 
 \begin{nodiff}{test/mars/auto/AutoRegisterSpec.cc}
  \begin{c++}
@@ -586,12 +577,7 @@ TestFactory& AutoRegisterSpec::composite(TestFactorySuite& suite) {
 #include <vector>
 
 SINGLETON(TestFactorySuite) EXTENDS(TestFactory) {
-  ~TestFactorySuite();
   void addFactory(TestFactory*);
-
-private:
-  template <typename F>
-  void foreach(F f) const;
 
 private:
   Test* make() override;
@@ -699,16 +685,15 @@ namespace {
  \begin{c++}
 #include <mars/auto/AutoTestSuite.h>
 #include <mars/core/TestFixture.h>
-#include <mars/utils/Symbol.h>
+#include <mars/util/Symbol.h>
+#include <mars/util/Self.h>
 
-#define DEF_FIXTURE(fixture, super)                          \
-struct fixture;                                              \
-static AutoTestSuite<fixture> UNIQUE_NAME(auto_suite);  \
-struct fixture : super
+#define FIXTURE(type)                                \
+struct type;                                         \
+static AutoTestSuite<type> UNIQUE_NAME(auto_suite_); \
+struct type : TestFixture, Self<type>
 
-#define FIXTURE(fixture)  DEF_FIXTURE(fixture, TestFixture)
-
-#define SETUP    void setUp override
+#define SETUP    void setUp() override
 #define TEARDOWN void tearDown() override
 
 #define SUPER_SETUP(super)    super::setUp()
@@ -721,17 +706,55 @@ struct fixture : super
 #include <mars/auto/AutoTestMethod.h>
 #include <mars/util/Symbol.h>
 
-#define __TEST_NAME(id) __JOIN__(test_, id)
-#define __AUTO_TEST_METHOD(id)  __JOIN__(auto_test_method_, id)
+#define __TEST_NAME(id) JOIN(test_, id)
+#define __AUTO_TEST(id) JOIN(auto_test_, id)
 
-#define __DEF_TEST(id, name)                                                   \
-private:                                                                       \
-AutoTestMethod __AUTO_TEST_METHOD(id) {id, name, &self_type::__TEST_NAME(id)}; \
-public:                                                                        \
-void __TEST_NAME(id)()
+#define __DEF_TEST(id, name)                 \
+private:                                     \
+  AutoTestMethod __AUTO_TEST(id)             \
+    {id, name, &self_type::__TEST_NAME(id)}; \
+public:                                      \
+  void __TEST_NAME(id)()
 
 #define TEST(name) __DEF_TEST(UNIQUE_ID, name)
+ \end{c++}
+\end{nodiff}
 
+\begin{nodiff}{include/mars/dsl/TestDef.h}
+ \begin{c++}
+namespace {
+  struct AutoRegisterSpec : testing::Test {
+  protected:
+    AutoRegisterSpec() : progress(ss), root(suite()) {
+      result.addListener(progress);
+    }
+
+    ~AutoRegisterSpec() {
+      delete root;
+    }
+
+    void assertOutput(const char* output) {
+      ASSERT_EQ(ss.str(), output);
+    }
+
+  private:
+    static ::Test* suite() {
+      TestFactory& factory = TestFactorySuite::instance();
+      return factory.make();
+    }
+
+  protected:
+    std::ostringstream ss;
+    TestResult result;
+    TextProgress progress;
+    ::Test* root;
+  };
+}
+
+TEST_F(AutoRegisterSpec, run_all_xunit_mars_test) {
+  result.runRootTest(*root);
+  assertOutput("starting...\n******\nend.\n");
+}
  \end{c++}
 \end{nodiff}
 
