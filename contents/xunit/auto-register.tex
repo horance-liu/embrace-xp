@@ -16,13 +16,13 @@
 
 \begin{content}
 
-\subsection{xUnit Mars用例}
+\subsection{雏形}
 
-基于目前\ascii{xUnit Mars}的框架实现，已经具备条件设计\ascii{xUnit Mars}风格的测试用例了。目前，\ascii{xUnit Mars}缺失\ascii{DSL}的基本能力，此时用例命名遵循\cpp{}函数命名的规范。同时，继承\ascii{TestFixture}，根据用例场景的实际需求，覆写相关的成员函数\ascii{setUp, tearDown}。
+基于目前\ascii{xUnit Mars}的框架实现，已经具备条件设计\ascii{xUnit Mars}风格的测试用例了。目前，\ascii{xUnit Mars}缺失\ascii{DSL}的构建能力，因此测试用例遵循\cpp{}函数命名的基本规范。根据场景的实际需求，覆写相关的成员函数\ascii{setUp, tearDown}。
 
-另外，\ascii{xUnit Mars}也缺失\emph{断言}的基本特性，目前暂时使用\ascii{Google Test}提供的基本特性完成。例如，遵循\ascii{xUnit Mars}风格，设计实现了\ascii{StackSpec}的测试用例套件。
+另外，\ascii{xUnit Mars}目前还未支持\emph{断言接口}，暂且使用\ascii{Google Test}提供的基本特性完成。例如，设计实现了\ascii{StackSpec}的测试用例套件。
 
-\begin{nodiff}{test/mars/auto/StackSpec.cc}
+\begin{nodiff}{test/mars/auto/ManualStackSpec.cc}
  \begin{c++}
 #include <gtest/gtest.h>
 #include <mars/core/TestFixture.h>
@@ -58,16 +58,17 @@ namespace {
 
 \subsection{手动注册}
 
-目前，\ascii{xUnit Mars}缺失用例的\emph{自动注册}，或\emph{自动发现}的基本功能。此时，为了能够运行\ascii{StackSpec}中的\emph{测试函数}，目前只能手动注册。
+目前，\ascii{xUnit Mars}缺失用例\emph{自动注册}、\emph{自动发现}的基本功能。此时，为了能够运行\ascii{StackSpec}中的测试方法，暂且通过手动注册完成。
 
-\begin{nodiff}{test/mars/auto/StackSpec.cc}
+\begin{nodiff}{test/mars/auto/ManualStackSpec.cc}
  \begin{c++}
 #include <gtest/gtest.h>
 #include <mars/core/TestSuite.h>
+#include <mars/core/TestMethod.h>
 
 // ...
 
-TEST(ManualRegisterSpec, run_stack_spec) {
+TEST(ManualStackSpec, run_stack_spec) {
   TestSuite suite("StackSpec");
   suite.add(new TestMethod<StackSpec>(&StackSpec::apply_pop_0_time));
   suite.add(new TestMethod<StackSpec>(&StackSpec::apply_pop_1_time));
@@ -76,32 +77,24 @@ TEST(ManualRegisterSpec, run_stack_spec) {
  \end{c++}
 \end{nodiff}
 
-\subsection{手动运行}
+\subsection{手动执行}
 
-目前，\ascii{xUnit Mars}也缺失用例\emph{自动运行}的基本功能，需要手动完成用例的运行环境的搭建和启动过程。搭建运行环境，主要包括创建\ascii{TestResult}，及其监听\ascii{TestResult}变化的一个或多个监听器\ascii{TestListener}。例如，此处仅提供一个监听器\ascii{TextProgress}，用于监测\ascii{xUnit Mars}内部运行是否符合预期行为。
+目前，\ascii{xUnit Mars}缺失测试用例\emph{自动运行}的基本功能，需要手动搭建测试用例的运行环境，并手动启动的执行引擎。
 
-\begin{nodiff}{test/mars/auto/StackSpec.cc}
+搭建运行环境，主要包括创建\ascii{TestResult}对象，配置一个或多个监听\ascii{TestResult}变化的\ascii{TestListener}实例。启动执行引擎，则通过调用\ascii{TestResult::runRooTest}接口触发。例如，此处仅提供一个监听器\ascii{TextProgress}，用于监测\ascii{xUnit Mars}内部运行是否符合预期行为。
+
+\begin{nodiff}{test/mars/auto/ManualStackSpec.cc}
  \begin{c++}
 #include <gtest/gtest.h>
 #include <mars/core/TestResult.h>
 #include <mars/listener/text/TextProgress.h>
 #include <sstream>
 
-// ...
-
 namespace {
-  struct ManualRegisterSpec : testing::Test {
+  struct ManualStackSpec : testing::Test {
   protected:
-    ManualRegisterSpec() : progress(ss) {
+    ManualStackSpec() : progress(ss) {
       result.addListener(progress);
-    }
-
-    void run(::Test& test) {
-      result.runRootTest(test);
-    }
-
-    void assertOutput(const char* output) {
-      ASSERT_EQ(ss.str(), output);
     }
 
   protected:
@@ -111,19 +104,19 @@ namespace {
   };
 }
 
-TEST_F(ManualRegisterSpec, run_stack_spec) {
+TEST_F(ManualStackSpec, run_stack_spec) {
   TestSuite suite("StackSpec");
   suite.add(new TestMethod<StackSpec>(&StackSpec::apply_pop_0_time));
   suite.add(new TestMethod<StackSpec>(&StackSpec::apply_pop_1_time));
   suite.add(new TestMethod<StackSpec>(&StackSpec::apply_pop_2_times));
 
-  run(suite);
-  assertOutput("starting...\n***\nend.\n");
+  result.runRootTest(suite);
+  ASSERT_EQ(ss.str(), "starting...\n***\nend.\n");
 }
  \end{c++}
 \end{nodiff}
 
-测试通过。
+至此，测试通过。
 
 \end{content}
 
@@ -133,17 +126,25 @@ TEST_F(ManualRegisterSpec, run_stack_spec) {
 
 \subsection{自动化}
 
-手动注册\ascii{TestMethod}实在是太笨拙了，必须引入自动化的实现机制。重构既有的测试用例，并使其失败。首当其冲，将\ascii{ManualRegisterSpec}重命名为\ascii{AutoStackSpec}，以示意图。
+手动注册\ascii{TestMethod}非常笨拙，不仅容易出错，而且可读性极差。可以引入实用的宏定义，改善用户体验。但是，其并不能完美解决核心问题，用户依然需要手动注册。
 
-在\ascii{AutoStackSpec}中，创建用例树的根节点\ascii{root}，并使用静态工厂方法\ascii{suite}完成初始化。在\ascii{suite}实现中，它试图从仓库\ascii{TestMethodRegistry<StackSpec>}的单例中获取所有测试方法。接下来，核心问题转变为：如何自动化地将\ascii{StackSpec}中的所有测试方法注册到\ascii{TestMethodRegistry<StackSpec>}单例之中。
+因此，需要考虑引入自动化的实现机制，使得用户彻底不用关心这件繁琐的事情。重构既有的测试用例，并使其失败。首当其冲，将\ascii{ManualStackSpec}重命名为\ascii{AutoStackSpec}。
 
-\begin{nodiff}{test/mars/auto/StackSpec.cc}
+在\ascii{AutoStackSpec}中，创建用例树的根节点\ascii{root}，并使用静态工厂方法\ascii{suite}完成初始化。在\ascii{suite}实现中，首先试图获取\ascii{TestFactory}工厂实例，然后创建\ascii{StackSpec}的所有测试方法。
+
+最后，核心问题转变为：如何自动发现\ascii{StackSpec}之中的所有测试方法，并将它们的原型信息自动注册到\ascii{TestFixtureFactory<StackSpec>}单例之中？
+
+重构既有的测试用例，使其失败。删除所有手动注册\ascii{TestMethod}实例的实现，通过调用工厂方法自动创建\ascii{StackSpec}对应的\ascii{TestMethod}实例。
+
+\begin{nodiff}{test/mars/auto/AutoStackSpec.cc}
  \begin{c++}
 #include <gtest/gtest.h>
 #include <mars/core/TestResult.h>
 #include <mars/listener/text/TextProgress.h>
-#include <mars/auto/TestMethodRegistry.h>
+#include <mars/factory/TestFixtureFactory.h>
 #include <sstream>
+
+// ...
 
 namespace {
   struct AutoStackSpec : testing::Test {
@@ -156,12 +157,10 @@ namespace {
       delete root;
     }
 
-    void assertOutput(const char* output) {
-      ASSERT_EQ(ss.str(), output);
-    }
-
   private:
-    static ::Test* suite();
+    static ::Test* suite() {
+      return TestFixtureFactory<StackSpec>::instance().make();
+    }
 
   protected:
     std::ostringstream ss;
@@ -169,47 +168,37 @@ namespace {
     TextProgress progress;
     ::Test* root;
   };
-  
-  ::Test* AutoStackSpec::suite() {
-    return TestMethodRegistry<StackSpec>::instance().suite();
-  }
 }
 
 TEST_F(AutoStackSpec, run_stack_spec) {
   result.runRootTest(*root);
-  assertOutput("starting...\n***\nend.\n");
+  ASSERT_EQ(ss.str(), "starting...\n***\nend.\n");
 }
  \end{c++}
 \end{nodiff}
 
-为了篇幅所限，后文仅展示\ascii{AutoStackSpec::suite}的重构效果，\ascii{AutoStackSpec}的整体逻辑不再详细罗列，请自行在此查阅上下文。
+\subsubsection{空仓库}
 
-\subsection{空仓库}
+为了能够通过编译，创建单例的工厂类\ascii{TestFixtureFactory}，其工厂方法暂且返回一个空的\ascii{TestSuite}实例。
 
-应用伪实现，迁移\ascii{TestMethodRegistry}至产品实现时，发现无法搬迁\ascii{StackSpec}的相关成员函数至\ascii{TestMethodRegistry}之中，因为\ascii{StackSpec}属于测试领域，\ascii{TestMethodRegistry}属于产品领域。
-
-因此，实现\ascii{TestMethodRegistry::suite}工厂方法时，暂且返回一个空的\ascii{TestSuite}实例，此时只能通过编译，但不能通过测试。
-
-\begin{nodiff}{include/mars/auto/TestMethodRegistry.h}
+\begin{nodiff}{include/mars/factory/TestFixtureFactory.h}
  \begin{c++}
-#include <mars/core/TestSuite.h>
 #include <mars/util/Singleton.h>
+#include <mars/core/TestSuite.h>
 
-GENERIC_SINGLETON(TestMethodRegistry, Fixture) {
-  Test* suite() const {
-    return new TestSuite();
+GENERIC_SINGLETON(TestFixtureFactory, Fixture) {
+  Test* make() {
+    return new TestSuite;
   }
 };
  \end{c++}
 \end{nodiff}
 
-\ascii{TestMethodRegistry}是一个单例，但与普通单例存在微妙的差异，它存在一个泛型参数\ascii{Fixture}。更为特殊地，在整个\ascii{TestMethodRegistry}类域中，都未曾使用过该泛型参数。
-
-事实上，泛型参数\ascii{Fixture}的存在，将会自动地为每个\ascii{Fixture}创建一个单例。如此，对于每个\ascii{Fixture}类型，都会存在一个唯一的、独立的、隔离的存储空间。例如，在\ascii{StackSpec.cc}中，将自动创建一个\ascii{TestMethodRegistry<StackaSpec>}的单例。
+\ascii{TestFixtureFactory}是一个单例，但与普通单例实现存在微妙的差异。它拥有一个泛型参数\ascii{Fixture}，使得每个\ascii{Fixture}类型，都会存在一个唯一的、独立的、隔离的存储空间。例如，在\ascii{StackSpec.cc}中，将自动创建一个\ascii{TestFixtureFactory<StackaSpec>}的单例，与其他\ascii{TestFixtureFactory<Fixture>}实例相隔离。
 
 \subsubsection{实用宏：单例}
 
-实现单例遵循固有的实现模式，为了消除重复设计，提取\ascii{Singleton}的公共实现，并放在基础设施之中。引入\ascii{Singleton}将免费得到\ascii{instance}的公共方法实现。切忌在每个单例实现中，都复制拷贝一份单例实现；否则将引入严重的重复设计。
+实现单例遵循固有的实现模式，为了消除\ascii{Singleton}的重复设计，提取\ascii{Singleton}的公共实现，并放在产品实现的基础设施之中。引入\ascii{Singleton}将免费得到\ascii{instance}的公共实现。切忌在每个单例实现中，都复制拷贝一份单例实现；否则将引入严重的重复设计。
 
 为了方便用户快速创建单例类，此处提供两个实用的宏定义。其中，\ascii{SINGLETON}用于创建普通的单例，而\ascii{GENERIC\_SINGLETON}创建带有泛型参数的单例。
 
@@ -235,18 +224,17 @@ protected:
  \end{c++}
 \end{nodiff}
 
+至此，仅能通过编译，但不能通过测试。
+
 \subsection{代码注入}
 
-为了能够通过测试，必须提供一种自动注册的实现机制，将\ascii{StackSpec}的所有测试方法自动地注册到\ascii{TestMethodRegistry<StackSpec>}单例之中。但是，由于\cpp{}缺失反射的机制，发现测试方法变得相当棘手。
+为了能够通过测试，必须提供一种自动注册的实现机制，萃取\ascii{StackSpec}测试方法的原型信息，并自动地注册到\ascii{TestFixtureFactory<StackSpec>}单例之中。但是，由于\cpp{}缺失反射的机制，发现测试方法变得相当棘手。
 
-应用\emph{代码注入}技术，当生成\ascii{StackSpec}实例时，将自动执行这些注入的代码，随将\ascii{StackSpec}之中的所有测试方法自动地注册到\ascii{TestMethodRegistry<StackSpec>}单例之中。
-
-此时，需要改写\ascii{AutoStackSpec::suite}的实现，它创建了一个局部的\ascii{StackSpec}实例，此刻将触发完成所有\ascii{StackSpec}测试方法的自动注册。
-
-众所周知，\ascii{StackSpec}实例会被经常创建和销毁。因此，\ascii{TestMethodRegistry<StackSpec>}仓库实现必须提供一种预先的、轻量级的准入机制，禁止重复，或覆盖行为发生，留待后续处理。
+应用\emph{代码注入}技术，当生成\ascii{StackSpec}实例时，将自动执行这些注入的代码，完成\ascii{StackSpec}测试方法原型的萃取过程。
 
 \begin{nodiff}{test/mars/auto/StackSpec.cc}
  \begin{c++}
+#include <gtest/gtest.h>
 #include <mars/core/TestFixture.h>
 #include <mars/auto/AutoTestMethod.h>
 #include <stack>
@@ -260,80 +248,127 @@ namespace {
       v.push(2);
     }
 
+  private:
+    AutoTestMethod m1{1, "apply_pop_0_time", &StackSpec::apply_pop_0_time};
+
+  public:
     void apply_pop_0_time() {
       ASSERT_EQ(2, v.top());
     }
 
-    AutoTestMethod m1{1, "apply_pop_0_time", &StackSpec::apply_pop_0_time};
+  private:
+    AutoTestMethod m2{2, "apply_pop_1_time", &StackSpec::apply_pop_1_time};
 
+  public:
     void apply_pop_1_time() {
       v.pop();
       ASSERT_EQ(1, v.top());
     }
 
-    AutoTestMethod m2{2, "apply_pop_1_time", &StackSpec::apply_pop_1_time};
+  private:
+    AutoTestMethod m3{3, "apply_pop_2_times", &StackSpec::apply_pop_2_times};
 
+  public:
     void apply_pop_2_times() {
       v.pop();
       v.pop();
       ASSERT_TRUE(v.empty());
     }
-
-    AutoTestMethod m3{3, "apply_pop_0_time", &StackSpec::apply_pop_2_times};
   };
-
-  ::Test* AutoStackSpec::suite() {
-    StackSpec dummy; // register all test methods into registry.
-    return TestMethodRegistry<StackSpec>::instance().suite();
-  }
 }
  \end{c++}
 \end{nodiff}
 
-\subsection{自动注册}
+\subsubsection{自动注册}
 
-\ascii{AutoTestMethod}实现非常简单。在构造函数中，它生成一个\ascii{TestMethod}实例，并自动地注册到对应的\ascii{TestMethodRegistry<Fixture>}单例之中。
+为了能够通过编译，创建\ascii{AutoTestMethod}。在构造函数中，自动地注册测试方法的原型信息至\ascii{TestFixtureFactory<Fixture>}单例之中。
 
 \begin{nodiff}{include/mars/auto/AutoTestMethod.h}
  \begin{c++}
-#include <mars/auto/TestMethodRegistry.h>
-#include <mars/core/TestMethod.h>
+#include <mars/factory/TestFixtureFactory.h>
+#include <mars/core/Method.h>
 
 struct AutoTestMethod {
   template <typename Fixture>
-  AutoTestMethod(int id, const char* name, void(Fixture::*method)()) {
-    auto& registry = TestMethodRegistry<Fixture>::instance();
-    registry.put(id, new TestMethod<Fixture>(method, name));
+  AutoTestMethod(int id, const char* name, Method<Fixture> method) {
+    auto& registry = TestFixtureFactory<Fixture>::instance();
+    registry.add(id, name, method);
   }
 };
  \end{c++}
 \end{nodiff}
 
-\subsection{仓库实现}
+\subsubsection{注册接口}
 
-为了能够通过编译，首先在\ascii{TestMethodRegistry}中空实现注册接口\ascii{put}。待编译通过，接着为了通过测试，创建\ascii{std::map}的数据结构。一方面，基于抽象类型\ascii{Test}，显式实现\ascii{put}方法，完成测试用例的注册。另一方面，工厂方法\ascii{suite}将当前已注册的所有\ascii{Test}实例打包为一个\ascii{TestSuite}实例，最终返回给客户。
+为了能够通过编译，暂且空实现注册接口\ascii{TestFixtureFactory::add}。同时，重构工厂方法\ascii{TestFixtureFactory::make}的实现逻辑，当它被第一次调用时，初始创建一个局部的、静态的\ascii{StackSpec}实例，此刻将触发创建和初始化\ascii{StackSpec}实例相关的所有\ascii{AutoTestMethod}实例，最终在\ascii{AutoTestMethod}的构造函数中完成对应测试方法原型的萃取过程。
 
-在\ascii{TestMethodRegistry::put}实现中，预先判断\ascii{id}对应的用例是否已经存在。如果存在，则直接略过；否则，在\ascii{map}中创建相应的记录。
+因为这个过程相当隐晦，目前也没有更好的实现方法替换。因此，补充相关注释信息至关重要。众所周知，\ascii{StackSpec}实例会被经常创建和销毁。因此，\ascii{TestFixtureFactory}的实现必须提供一种预先的、轻量级的准入机制，禁止重复，或覆盖行为发生。
 
 \begin{nodiff}{include/mars/auto/TestMethodRegistry.h}
  \begin{c++}
-#include <mars/core/TestSuite.h>
 #include <mars/util/Singleton.h>
-#include <map>
+#include <mars/core/TestSuite.h>
+#include <mars/core/Method.h>
 
-GENERIC_SINGLETON(TestMethodRegistry, Fixture) {
-  void put(int id, Test* test) {
+GENERIC_SINGLETON(TestFixtureFactory, Fixture) {
+  void add(int id, const char* name, Method<Fixture> method) {
+  }
+
+  Test* make() {
+    static Fixture dummy; // register all test methods to this.
+    return new TestSuite;
+  }
+};
+ \end{c++}
+\end{nodiff}
+
+至此，编译通过，依然未能通过测试。
+
+\subsubsection{原子工厂}
+
+为了能够存储测试方法的原型信息，封装\ascii{<name, method>}的二元组信息，并将其命名为\ascii{TestMethodFactory}，它根据测试方法的原型信息创建\ascii{TestMethod}实例。
+
+\begin{nodiff}{include/mars/factory/TestMethodFactory.h}
+ \begin{c++}
+#include <mars/core/TestMethod.h>
+
+template <typename Fixture>
+struct TestMethodFactory {
+  TestMethodFactory(const char* name, Method<Fixture> method)
+    : name(name), method(method) {}
+
+  Test* make() {
+    return new TestMethod<Fixture>(method, name);
+  }
+
+private:
+  const char* name;
+  Method<Fixture> method;
+};
+ \end{c++}
+\end{nodiff}
+
+\subsubsection{实现注册接口}
+
+在\ascii{TestFixtureFactory}实现中，创建类型为\ascii{std::unordered\_map}的存储结构，用于存储和检索\ascii{TestMethodFactory}实例。在\ascii{TestMethodRegistry::add}实现中，预先判断\ascii{id}对应的原子工厂是否已经存在。如果存在，避免重复注册；否则，在\ascii{map}中创建相应的记录。
+
+\begin{nodiff}{include/mars/auto/TestMethodRegistry.h}
+ \begin{c++}
+#include <mars/util/Singleton.h>
+#include <mars/core/TestSuite.h>
+#include <mars/factory/TestMethodFactory.h>
+#include <unordered_map>
+
+GENERIC_SINGLETON(TestFixtureFactory, Fixture) {
+  void add(int id, const char* name, Method<Fixture> method) {
     if (!exist(id)) {
-      registry.emplace(id, test);
+      registry.insert({id, {name, method}});
     }
   }
 
-  Test* suite() const {
-    auto suite = new TestSuite();
-    for (auto& test : registry) {
-      suite->add(test.second);
-    }
-    return suite;
+  Test* make() {
+    static Fixture dummy; // register all test methods to this.
+    return new TestSuite;
   }
 
 private:
@@ -342,37 +377,173 @@ private:
   }
 
 private:
-  std::map<int, Test*> registry;
+  std::unordered_map<int, TestMethodFactory<Fixture>> registry;
+};
+ \end{c++}
+\end{nodiff}
+
+\subsubsection{实现工厂方法}
+
+提取工厂方法\ascii{suite}，遍历已注册的\ascii{TestMethodFactory}实例，创建对应\ascii{TestMethod}实例。最终，将所有\ascii{TestMethod}实例打包为一个\ascii{TestSuite}实例，返回给客户。
+
+\begin{nodiff}{include/mars/factory/TestFixtureFactory.h}
+ \begin{c++}
+#include <mars/util/Singleton.h>
+#include <mars/core/TestSuite.h>
+#include <mars/factory/TestMethodFactory.h>
+#include <unordered_map>
+
+GENERIC_SINGLETON(TestFixtureFactory, Fixture) {
+  void add(int id, const char* name, Method<Fixture> method) {
+    if (!exist(id)) {
+      registry.insert({id, {name, method}});
+    }
+  }
+
+  Test* make() {
+    static Fixture dummy; // register all test methods to this.
+    return suite();
+  }
+
+private:
+  bool exist(int id) const {
+    return registry.find(id) != registry.end();
+  }
+
+  Test* suite() {
+    auto result = new TestSuite;
+    for (auto& i : registry) {
+      result->add(i.second.make());
+    }
+    return result;
+  }
+
+private:
+  std::unordered_map<int, TestMethodFactory<Fixture>> registry;
 };
  \end{c++}
 \end{nodiff}
 
 此时，测试通过。
 
-\end{content}
-
-\section{古生代}
-
-\begin{content}
-
 \subsection{提炼工厂}
 
-虽然能够自动注册\ascii{StackSpec}的测试方法，但是还是需要手动地调用\ascii{AutoStackSpec::suite}方法，自动注册\ascii{StackSpec}的测试方法，并创建\ascii{StackSpec}对应的\ascii{TestSuite}实例。
+基于上述观察，提取关键抽象\ascii{TestFactory}。
 
-\begin{nodiff}{test/mars/auto/StackSpec.cc}
+\begin{nodiff}{include/mars/auto/TestFactory.h}
  \begin{c++}
-namespace {
-  ::Test* AutoStackSpec::suite() {
-    StackSpec dummy; // register all test methods into registry.
-    return TestMethodRegistry<StackSpec>::instance().suite();
+struct Test;
+
+struct TestFactory {
+  virtual Test* make() = 0;
+  virtual ~TestFactory() {}
+};
+ \end{c++}
+\end{nodiff}
+
+\subsubsection{原子工厂}
+
+\begin{nodiff}{include/mars/factory/TestMethodFactory.h}
+ \begin{c++}
+#include <mars/factory/TestFactory.h>
+#include <mars/core/TestMethod.h>
+
+template <typename Fixture>
+struct TestMethodFactory : TestFactory {
+  TestMethodFactory(const char* name, Method<Fixture> method)
+    : name(name), method(method) {}
+
+private:
+  Test* make() override {
+    return new TestMethod<Fixture>(method, name);
   }
+
+private:
+  const char* name;
+  Method<Fixture> method;
+};
+ \end{c++}
+\end{nodiff}
+
+\subsubsection{复合工厂}
+
+\begin{nodiff}{include/mars/factory/TestSuiteFactory.h}
+ \begin{c++}
+#include <mars/factory/TestFactory.h>
+#include <vector>
+
+struct TestSuiteFactory : TestFactory {
+  void add(TestFactory&);
+
+protected:
+  Test* make() override;
+
+private:
+  std::vector<TestFactory*> factories;
+};
+ \end{c++}
+\end{nodiff}
+
+\begin{nodiff}{src/mars/auto/TestFactorySuite.cc}
+ \begin{c++}
+#include <mars/factory/TestSuiteFactory.h>
+#include <mars/core/TestSuite.h>
+
+void TestSuiteFactory::add(TestFactory& f) {
+  factories.push_back(&f);
+}
+
+Test* TestSuiteFactory::make() {
+  auto suite = new TestSuite;
+  for (auto f : factories) {
+    suite->add(f->make());
+  }
+  return suite;
 }
  \end{c++}
 \end{nodiff}
 
-当增加另外一组用例时，例如\ascii{QueueSpec}。
+\subsubsection{搬迁基类}
 
-\begin{nodiff}{test/mars/auto/QueueSpec.cc}
+\begin{nodiff}{include/mars/factory/TestFixtureFactory.h}
+ \begin{c++}
+#include <mars/factory/TestMethodFactory.h>
+#include <mars/factory/TestSuiteFactory.h>
+#include <mars/util/Singleton.h>
+#include <unordered_map>
+
+GENERIC_SINGLETON(TestFixtureFactory, Fixture) EXTENDS(TestSuiteFactory) {
+  void add(int id, const char* name, Method<Fixture> method) {
+    if (!exist(id)) {
+      registry.insert({id, {name, method}});
+      TestSuiteFactory::add(registry.at(id));
+    }
+  }
+
+private:
+  Test* make() override {
+    static Fixture dummy; // register all test methods to registry.
+    return TestSuiteFactory::make();
+  }
+
+private:
+  bool exist(int id) const {
+    return registry.find(id) != registry.end();
+  }
+
+private:
+  std::unordered_map<int, TestMethodFactory<Fixture>> registry;
+};
+ \end{c++}
+\end{nodiff}
+
+通过测试。
+
+\subsection{执行器}
+
+当增加另外一组测试用例套件时，例如\ascii{QueueSpec}。
+
+\begin{nodiff}{test/mars/auto/AutoQueueSpec.cc}
  \begin{c++}
 #include <mars/core/TestFixture.h>
 #include <mars/auto/AutoTestMethod.h>
@@ -414,199 +585,217 @@ namespace {
  \end{c++}
 \end{nodiff}
 
-\ascii{AutoQueueSpec::suite}将重复创建逻辑，引入重复设计。
+\subsubsection{手动执行}
 
-\begin{nodiff}{test/mars/auto/QueueSpec.cc}
+\begin{nodiff}{test/mars/auto/AutoQueueSpec.cc}
  \begin{c++}
+#include <gtest/gtest.h>
+#include <mars/core/TestResult.h>
+#include <mars/listener/text/TextProgress.h>
+#include <mars/factory/TestFixtureFactory.h>
+#include <sstream>
+
 namespace {
-  ::Test* AutoQueueSpec::suite() {
-    QueueSpec dummy; // register all test methods into registry.
-    return TestMethodRegistry<QueueSpec>::instance().suite();
-  }
+  struct AutoQueueSpec : testing::Test {
+  protected:
+    AutoQueueSpec() : progress(ss), root(suite()) {
+      result.addListener(progress);
+    }
+
+    ~AutoQueueSpec() {
+      delete root;
+    }
+
+  private:
+    static ::Test* suite() {
+      TestFactory& factory = TestFixtureFactory<QueueSpec>::instance();
+      return factory.make();
+    }
+
+  protected:
+    std::ostringstream ss;
+    TestResult result;
+    TextProgress progress;
+    ::Test* root;
+  };
+}
+
+TEST_F(AutoQueueSpec, run_queue_spec) {
+  result.runRootTest(*root);
+  ASSERT_EQ("starting...\n***\nend.\n", ss.str());
 }
  \end{c++}
 \end{nodiff}
 
-\subsubsection{原子工厂}
+\subsubsection{消除重复}
 
-基于上述观察，提取一个公共的泛型类\ascii{AutoTestFactory}，消除重复设计。
-
-\begin{nodiff}{test/mars/auto/QueueSpec.cc}
+\begin{nodiff}{test/mars/auto/AutoSpec.cc}
  \begin{c++}
-#include <mars/auto/TestMethodRegistry.h>
+#include <mars/runner/TestRunner.h>
+#include <mars/listener/text/TextProgress.h>
+#include <mars/factory/TestFixtureFactory.h>
+#include <stack>
+#include <queue>
+#include <sstream>
 
-struct Test;
+// ...
 
-template<typename Fixture>
-struct AutoTestFactory {
-  Test* make() {
-    Fixture dummy; // register all test methods to registry.
-    return TestMethodRegistry<Fixture>::instance().suite();
-  }
-};
- \end{c++}
-\end{nodiff}
+namespace {
+  template <typename Fixture>
+  struct GenericAutoSpec : testing::Test {
+  protected:
+    GenericAutoSpec()
+      : progress(ss)
+      , runner(progress, factory()) {}
 
-\subsubsection{复合工厂}
+  private:
+    static TestFactory& factory() {
+      return TestFixtureFactory<Fixture>::instance();
+    }
 
-为了消除\ascii{AutoStackSpec, AutoQueueSpec}之间的重复逻辑，将\ascii{StackSpec}与\ascii{QueueSpec}统一打包，一并运行。
+  protected:
+    std::ostringstream ss;
+    TextProgress progress;
+    TestRunner runner;
+  };
 
-\begin{nodiff}{test/mars/auto/AutoRegisterSpec.cc}
- \begin{c++}
-::Test* AutoRegisterSpec::suite() {
-  AutoTestFactory<StackSpec> f1;
-  AutoTestFactory<QueueSpec> f2;
+  using AutoStackSpec = GenericAutoSpec<StackSpec>;
+  using AutoQueueSpec = GenericAutoSpec<QueueSpec>;
+}
 
-  auto suite = new TestSuite;
-  suite->add(f1.make());
-  suite->add(f2.make());
-  return suite;
+TEST_F(AutoStackSpec, run_stack_spec) {
+  runner.run();
+  ASSERT_EQ("starting...\n***\nend.\n", ss.str());
+}
+
+TEST_F(AutoQueueSpec, run_queue_spec) {
+  runner.run();
+  ASSERT_EQ("starting...\n***\nend.\n", ss.str());
 }
  \end{c++}
 \end{nodiff}
 
-基于上述观察，提取关键抽象\ascii{TestFactory}。
+\subsubsection{实现执行器}
 
-\begin{nodiff}{include/mars/auto/TestFactory.h}
+\begin{nodiff}{include/mars/runner/TestRunner.h}
  \begin{c++}
-struct Test;
+#include <mars/core/TestResult.h>
 
-struct TestFactory {
-  virtual Test* make() = 0;
-  virtual ~TestFactory() {}
+struct TestFactory;
+
+struct TestRunner {
+  TestRunner(TestListener&, TestFactory&);
+  ~TestRunner();
+
+  void run();
+
+private:
+  TestResult result;
+  Test* root;
 };
  \end{c++}
 \end{nodiff}
 
-提取复合工厂\ascii{TestFactorySuite}。
-
-\begin{nodiff}{include/mars/auto/TestFactorySuite.h}
+\begin{nodiff}{src/mars/runner/TestRunner.cc}
  \begin{c++}
-#include <mars/auto/TestFactory.h>
-#include <vector>
+#include <mars/runner/TestRunner.h>
+#include <mars/factory/TestFactory.h>
+#include <mars/core/Test.h>
 
-struct TestFactorySuite : TestFactory {
-  void addFactory(TestFactory&);
+TestRunner::TestRunner(TestListener& listener, TestFactory& factory)
+  : root(factory.make()) {
+  result.addListener(listener);
+}
 
-private:
-  Test* make() override;
+TestRunner::~TestRunner() {
+  delete root;
+}
 
-private:
-  std::vector<TestFactory*> factories;
-};
+void TestRunner::run() {
+  result.runRootTest(*root);
+}
  \end{c++}
 \end{nodiff}
 
-\begin{nodiff}{src/mars/auto/TestFactorySuite.cc}
+\end{content}
+
+\section{古生代}
+
+\begin{content}
+
+\subsection{自动化}
+
+\begin{nodiff}{include/mars/startup/Startup.h}
  \begin{c++}
-#include <mars/auto/TestFactorySuite.h>
+void startup(int argv, char** argc);
+ \end{c++}
+\end{nodiff}
+
+\begin{nodiff}{src/mars/startup/Startup.cc}
+ \begin{c++}
+#include <mars/startup/Startup.h>
+#include <mars/listener/text/ColorfulPrinter.h>
+#include <mars/factory/TestSuiteFactory.h>
+#include <mars/runner/TestRunner.h>
+
+void startup(int, char**) {
+  ColorfulPrinter printer;
+  TestRunner runner(printer, TestSuiteFactory::root());
+  runner.run();
+}
+ \end{c++}
+\end{nodiff}
+
+\subsubsection{main函数}
+
+\begin{nodiff}{src/mars/startup/Startup.cc}
+ \begin{c++}
+#include <gtest/gtest.h>
+#include <mars/startup/Startup.h>
+
+int main(int argc, char** argv) {
+  testing::InitGoogleTest(&argc, argv);
+  startup(argc, argv);
+  return RUN_ALL_TESTS();
+}
+ \end{c++}
+\end{nodiff}
+
+\subsubsection{根节点}
+
+\begin{nodiff}{src/mars/factory/TestSuiteFactory.cc}
+ \begin{c++}
+#include <mars/factory/TestSuiteFactory.h>
 #include <mars/core/TestSuite.h>
 
-void TestFactorySuite::addFactory(TestFactory& f) {
-  factories.push_back(&f);
+// ...
+
+TestSuiteFactory& TestSuiteFactory::root() {
+  static TestSuiteFactory inst;
+  return inst;
 }
-
-Test* TestFactorySuite::make() {
-  auto suite = new TestSuite("All Tests");
-  for (auto f : factories) {
-    suite->add(f->make());
-  }
-  return suite;
-}
- \end{c++}
-\end{nodiff}
-
-此时，重构原子工厂\ascii{AutoTestFactory}，使其继承自\ascii{TestFactory}。
-
-\begin{nodiff}{include/mars/auto/AutoTestFactory.h}
- \begin{c++}
-#include <mars/auto/TestFactory.h> 
-#include <mars/auto/TestMethodRegistry.h>
-
-template<typename Fixture>
-struct AutoTestFactory : TestFactory {
-private:
-  Test* make() override {
-    Fixture dummy; // register all test methods to registry.
-    return TestMethodRegistry<Fixture>::instance().suite();
-  }
-};
- \end{c++}
-\end{nodiff}
-
-\subsubsection{手动组建}
-
-基于\ascii{TestFactory}的抽象，消除了\ascii{AutoTestFactory, TestFactorySuite}之间的一多之分。
-
-\begin{nodiff}{test/mars/auto/AutoRegisterSpec.cc}
- \begin{c++}
-::Test* AutoRegisterSpec::suite() {
-  TestFactorySuite multi;
-  AutoTestFactory<StackSpec> f1;
-  AutoTestFactory<QueueSpec> f2;
-
-  multi.addFactory(f1);
-  multi.addFactory(f2);
-
-  TestFactory& factory = multi;
-  return factory.make();
-}
- \end{c++}
-\end{nodiff}
-
-\subsection{自动组建}
-
-但是，组建工厂树的逻辑相当讨厌，需要实现自动注册的机制，自动发现\ascii{StackSpec, QueeuSpec}对应的\ascii{AutoTestFactory}，并逐一注册，减轻用户的负担。
-
-\begin{nodiff}{test/mars/auto/AutoRegisterSpec.cc}
- \begin{c++}
-::Test* AutoRegisterSpec::suite() {
-  TestFactory& factory = TestFactorySuite::instance();
-  return factory.make();
-}
- \end{c++}
-\end{nodiff}
-
-\subsubsection{工厂仓库}
-
-\begin{nodiff}{test/mars/auto/AutoRegisterSpec.cc}
- \begin{c++}
-#include <mars/util/Singleton.h>
-#include <mars/util/Keywords.h>
-#include <mars/auto/TestFactory.h>
-#include <vector>
-
-SINGLETON(TestFactorySuite) EXTENDS(TestFactory) {
-  void addFactory(TestFactory*);
-
-private:
-  Test* make() override;
-
-private:
-  std::vector<TestFactory*> factories;
-};
  \end{c++}
 \end{nodiff}
 
 \subsection{代码注入}
 
-\begin{nodiff}{test/mars/auto/StackSpec.cc}
+\begin{nodiff}{test/mars/auto/AutoSpec.cc}
  \begin{c++}
 #include <mars/core/TestFixture.h>
-#include <mars/auto/AutoTestSuite.h>
+#include <mars/auto/AutoTestFixture.h>
 #include <stack>
 #include <queue>
 
 namespace {
   struct StackSpec;
-  static AutoTestSuite<StackSpec> suite1;
+  static AutoTestFixture<StackSpec> suite1;
 
   struct StackSpec : TestFixture {
     // ...
   };
 
   struct QueueSpec;
-  static AutoTestSuite<QueueSpec> suite2;
+  static AutoTestFixture<QueueSpec> suite2;
 
   struct QueueSpec : TestFixture {
     // ...
@@ -615,28 +804,53 @@ namespace {
  \end{c++}
 \end{nodiff}
 
-\subsection{自动注册}
+\subsubsection{自动注册}
 
-\ascii{AutoTestSuite}在构造时，将原子工厂\ascii{AutoTestFactory}自动地注册到复合工厂\ascii{TestFactorySuite}的单例之中。
+\ascii{AutoTestFixture}在构造时，将每个\ascii{TestFixtureFactory<Fixture>}单例自动地注册到根节点\ascii{TestSuiteFactory::root}单例之中。
 
 \begin{nodiff}{include/mars/auto/AutoTestSuite.h}
  \begin{c++}
-#include <mars/auto/AutoTestFactory.h>
-#include <mars/auto/TestFactorySuite.h>
+#include <mars/factory/TestFixtureFactory.h>
+#include <mars/factory/TestSuiteFactory.h>
 
 template<typename Fixture>
-struct AutoTestSuite {
-  AutoTestSuite() {
-    TestFactorySuite::instance().addFactory(atom);
+struct AutoTestFixture {
+  AutoTestFixture(const char* name) {
+    auto& root = TestSuiteFactory::root();
+    auto& leaf = TestFixtureFactory<Fixture>::instance(name);
+    root.add(leaf);
   }
-
-private:
-  AutoTestFactory<Fixture> atom;
 };
  \end{c++}
 \end{nodiff}
 
-测试通过。
+此时，\ascii{xUnit Mars}风格的测试套件\ascii{AutoStackSpec, AutoQueueSpec}与\ascii{Google Test}一同执行。
+
+\begin{nodiff}{xUnit Mars执行结果}
+ \begin{c++}
+[==========] 6 test cases.
+[----------] 3 tests from StackSpec
+[ RUN      ] apply stack with pop 0 time
+[       OK ] apply stack with pop 0 time(0 us)
+[ RUN      ] apply stack with pop 1 time
+[       OK ] apply stack with pop 1 time(0 us)
+[ RUN      ] apply stack with pop 2 times
+[       OK ] apply stack with pop 2 times(0 us)
+[----------] 3 tests from StackSpec(0 us total)
+
+[----------] 3 tests from QueueSpec
+[ RUN      ] apply pop 0 time
+[       OK ] apply pop 0 time(0 us)
+[ RUN      ] apply pop 1 time
+[       OK ] apply pop 1 time(0 us)
+[ RUN      ] apply pop 2 times
+[       OK ] apply pop 2 times(0 us)
+[----------] 3 tests from QueueSpec(0 us total)
+
+[==========] 6 test cases.
+[  TOTAL   ] PASS: 6  FAILURE: 0  ERROR: 0  TIME: 3 us
+ \end{c++}
+\end{nodiff}
 
 \end{content}
 
@@ -644,11 +858,14 @@ private:
 
 \begin{content}
 
-\subsection{代码注入}
+\subsection{引入DSL}
 
-\begin{nodiff}{test/mars/auto/StackSpec.cc}
+\begin{nodiff}{test/mars/auto/AutoSpec.cc}
  \begin{c++}
-#include <mars/mars.h>
+#define GTEST_DONT_DEFINE_TEST 1
+#include <gtest/gtest.h>
+#include <mars/def/FixtureDef.h>
+#include <mars/def/TestDef.h>
 #include <stack>
 
 namespace {
@@ -679,18 +896,19 @@ namespace {
  \end{c++}
 \end{nodiff}
 
-\subsection{DSL: 领域描述语言}
+\subsubsection{实现FixtureDef}
 
 \begin{nodiff}{include/mars/dsl/FixtureDef.h}
  \begin{c++}
-#include <mars/auto/AutoTestSuite.h>
+#include <mars/auto/AutoTestFixture.h>
 #include <mars/core/TestFixture.h>
 #include <mars/util/Symbol.h>
 #include <mars/util/Self.h>
 
-#define FIXTURE(type)                                \
-struct type;                                         \
-static AutoTestSuite<type> UNIQUE_NAME(auto_suite_); \
+#define FIXTURE(type)                        \
+struct type;                                 \
+static AutoTestFixture<type>                 \
+  UNIQUE_NAME(auto_suite_)(STRINGIZE(type)); \
 struct type : TestFixture, Self<type>
 
 #define SETUP    void setUp() override
@@ -701,6 +919,8 @@ struct type : TestFixture, Self<type>
  \end{c++}
 \end{nodiff}
 
+\subsubsection{实现TestDef}
+
 \begin{nodiff}{include/mars/dsl/TestDef.h}
  \begin{c++}
 #include <mars/auto/AutoTestMethod.h>
@@ -709,52 +929,36 @@ struct type : TestFixture, Self<type>
 #define __TEST_NAME(id) JOIN(test_, id)
 #define __AUTO_TEST(id) JOIN(auto_test_, id)
 
-#define __DEF_TEST(id, name)                 \
-private:                                     \
-  AutoTestMethod __AUTO_TEST(id)             \
-    {id, name, &self_type::__TEST_NAME(id)}; \
-public:                                      \
-  void __TEST_NAME(id)()
+#define __DEF_TEST(id, name)               \
+private:                                   \
+AutoTestMethod __AUTO_TEST(id)             \
+  {id, name, &self_type::__TEST_NAME(id)}; \
+public:                                    \
+void __TEST_NAME(id)()
 
 #define TEST(name) __DEF_TEST(UNIQUE_ID, name)
  \end{c++}
 \end{nodiff}
 
-\begin{nodiff}{include/mars/dsl/TestDef.h}
+\subsubsection{类型萃取}
+
+\begin{nodiff}{include/mars/util/Self.h}
  \begin{c++}
-namespace {
-  struct AutoRegisterSpec : testing::Test {
-  protected:
-    AutoRegisterSpec() : progress(ss), root(suite()) {
-      result.addListener(progress);
-    }
+template <typename T>
+struct Self {
+protected:
+  using self_type = T;
+};
+ \end{c++}
+\end{nodiff}
 
-    ~AutoRegisterSpec() {
-      delete root;
-    }
+\subsection{发布API}
 
-    void assertOutput(const char* output) {
-      ASSERT_EQ(ss.str(), output);
-    }
-
-  private:
-    static ::Test* suite() {
-      TestFactory& factory = TestFactorySuite::instance();
-      return factory.make();
-    }
-
-  protected:
-    std::ostringstream ss;
-    TestResult result;
-    TextProgress progress;
-    ::Test* root;
-  };
-}
-
-TEST_F(AutoRegisterSpec, run_all_xunit_mars_test) {
-  result.runRootTest(*root);
-  assertOutput("starting...\n******\nend.\n");
-}
+\begin{nodiff}{include/mars/mars.h}
+ \begin{c++}
+#include <mars/def/FixtureDef.h>
+#include <mars/def/TestDef.h>
+#include <mars/startup/Startup.h>
  \end{c++}
 \end{nodiff}
 
