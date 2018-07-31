@@ -80,7 +80,7 @@ TEST_F(StackSpec, apply_pop_2_time) {
 \begin{nodiff}{坏味道：使用标识符命名用例}
  \begin{c++}
 // Bad Smell: test cases must be named using c++ identifier.
-TEST_F(RobotCleanerTest, at_beginning_the_robot_should_be_in_at_the_initial_position) {
+TEST_F(RobotCleanerTest, @at_beginning_the_robot_should_be_in_at_the_initial_position@) {
   ASSERT_EQ(Position(0, 0, NORTH), robot.getPosition());
 }
  \end{c++}
@@ -96,17 +96,17 @@ TEST_F(RobotCleanerTest, at_beginning_the_robot_should_be_in_at_the_initial_posi
 
 \begin{nodiff}{重复设计：测试装置与测试用例相分离}
  \begin{c++}
-struct RobotCleanerTest : testing::Test {
+struct @RobotCleanerTest@ : testing::Test {
 protected:
   RobotCleaner robot;
 };
  
 // Bad Smell: you must duplicate fixture name for each test case.
-TEST_F(RobotCleanerTest, at_beginning_the_robot_should_be_in_at_the_initial_position) {
+TEST_F(@RobotCleanerTest@, at_beginning_the_robot_should_be_in_at_the_initial_position) {
   ASSERT_EQ(Position(0, 0, NORTH), robot.getPosition());
 }
  
-TEST_F(RobotCleanerTest, robot_should_be_face_west_after_turn_left) {
+TEST_F(@RobotCleanerTest@, robot_should_be_face_west_after_turn_left) {
   robot.turnLeft();
   ASSERT_EQ(Position(0, 0, WEST), robot.getPosition());
 }
@@ -122,12 +122,13 @@ TEST_F(RobotCleanerTest, robot_should_be_face_west_after_turn_left) {
 \begin{nodiff}{错误：本应该使用protected，而错误地使用private}
  \begin{c++}
 struct RobotCleanerTest : testing::Test {
-private: // Error: should be protected
+@private:@ // should be protected
   RobotCleaner robot;
 };
  
 TEST_F(RobotCleanerTest, at_beginning_the_robot_should_be_in_at_the_initial_position) {
-  ASSERT_EQ(Position(0, 0, NORTH), robot.getPosition());
+  // Error: 'RobotCleaner RobotCleanerTest::robot' is private within this context.
+  ASSERT_EQ(Position(0, 0, NORTH), @robot@.getPosition());
 }
   \end{c++}
 \end{nodiff}
@@ -143,9 +144,10 @@ protected:
   RobotCleaner robot;
 };
 
-// Error: should be TEST\_F
-TEST(RobotCleanerTest, at_beginning_the_robot_should_be_in_at_the_initial_position) {
-  ASSERT_EQ(Position(0, 0, NORTH), robot.getPosition());
+// should be TEST\_F
+@TEST@(RobotCleanerTest, at_beginning_the_robot_should_be_in_at_the_initial_position) {
+  // Error: 'robot' was not declared in this scope.
+  ASSERT_EQ(Position(0, 0, NORTH), @robot@.getPosition());
 }
   \end{c++}
 \end{nodiff}
@@ -159,7 +161,7 @@ TEST(RobotCleanerTest, at_beginning_the_robot_should_be_in_at_the_initial_positi
 struct RobotCleanerTest : testing::Test {
 private:
   // Error: should override SetUp, not Setup/setup/setUp.
-  void Setup() {
+  void @Setup@() {
     robot.reset();
   }
  

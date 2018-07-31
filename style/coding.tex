@@ -24,6 +24,39 @@
 \definecolor{eTagColor}{rgb}{0.50,0.62,0.75}
 \definecolor{lineNumberColor}{rgb}{0.47,0.47,0.47}
 
+% Example:
+% \lstdefinestyle{SQL}{
+%     language={SQL},basicstyle=\ttfamily, 
+%     moredelim=**[is][\btHL]{`}{`},
+%     moredelim=**[is][{\btHL[fill=orange!30,draw=red,dashed,thin]}]{@}{@},
+% }
+% 
+% A listing with {\btHL highlighting of all \textbf{important} elements} looks as follows:
+% 
+% \begin{lstlisting}[style=SQL]
+% SELECT name, password `FROM` users @WHERE@ name=@UNION SELECT@
+% \end{lstlisting}
+%
+\makeatletter
+\newenvironment{btHighlight}[1][]
+{\begingroup\tikzset{bt@Highlight@par/.style={#1}}\begin{lrbox}{\@tempboxa}}
+{\end{lrbox}\bt@HL@box[bt@Highlight@par]{\@tempboxa}\endgroup}
+
+\newcommand\btHL[1][]{%
+  \begin{btHighlight}[#1]\bgroup\aftergroup\bt@HL@endenv%
+}
+\def\bt@HL@endenv{%
+  \end{btHighlight}%   
+  \egroup
+}
+\newcommand{\bt@HL@box}[2][]{%
+  \tikz[#1]{%
+    \pgfpathrectangle{\pgfpoint{1pt}{0pt}}{\pgfpoint{\wd #2}{\ht #2}}%
+    \pgfusepath{use as bounding box}%
+    \node[anchor=base west, fill=green!30,outer sep=0pt,inner xsep=0pt, inner ysep=0pt, rounded corners=1pt, minimum height=\ht\strutbox+1pt,#1]{\raisebox{1pt}{\strut}\strut\usebox{#2}};
+  }%
+}
+\makeatother
 
 %% 设置listings宏包的一些全局样式
 %% 参考http://hi.baidu.com/shawpinlee/blog/item/9ec431cbae28e41cbe09e6e4.html
@@ -46,9 +79,9 @@ belowcaptionskip=1em
 
 \lstdefinestyle{numbers}{
    numbers=left,
-   numberstyle=\tiny,
+   numberstyle=\tiny\color{lineNumberColor}\lstfontfamily,
    stepnumber=1,
-   numbersep=1em
+   numbersep=1em,
 }
 
 \lstdefinestyle{C++}{
@@ -59,9 +92,9 @@ belowcaptionskip=1em
    emphstyle=\bfseries,
    keywordstyle=\color{keywordColor}\bfseries, %% 关键字高亮
    stringstyle=\color{stringColor},  
-   numberstyle=\color{lineNumberColor}\lstfontfamily,
-   morekeywords={alignas, alignof, char16_t, char32_t, constexpr, decltype, noexcept, nullptr, static_assert, thread_local, override, final}
-   style=numbers,
+   morekeywords={alignas, alignof, char16_t, char32_t, constexpr, decltype, noexcept, nullptr, static_assert, thread_local, override, final},
+   moredelim=**[is][\btHL]{@}{@},
+   %style=numbers,
    %frame=leftline,                     %% 给代码加框
    %framerule=2pt,
    %rulesep=5pt
@@ -157,3 +190,4 @@ belowcaptionskip=1em
 \renewcommand\thefigure{\thechapter-\arabic{figure}}
 
 \newcommand\refcode[1]{{\itshape \lstlistingname\ascii{\ref{code:#1}（第\pageref{code:#1}页）}}}
+
