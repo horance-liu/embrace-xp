@@ -116,7 +116,7 @@ $ git commit -m"setup cmake project"
 
 但是，将第一个测试用例跑起来并不容易。这里尝试模拟设计一个\ascii{xUnit Mars}风格的测试用例，将其命名为\ascii{WasRun}，它包含了一个\emph{测试方法}：\ascii{WasRun::testMethod}。当测试方法\ascii{WasRun::testMethod}被执行后，断言其状态与行为是否符合预期。
 
-\begin{nodiff}{test/mars/core/TestMethodSpec.cc}
+\begin{nodiff}{test/mars/core/WasRunSpec.cc}
 \begin{c++}
 #include <gtest/gtest.h>
 
@@ -151,7 +151,7 @@ TEST(WasRunSpec, make_sure_test_method_be_ran) {
 
 据此，引入\ascii{xUnit Mars}执行测试方法的核心\ascii{API}：\ascii{run}函数。其第一个参数接受\ascii{WasRun}的测试对象，第二个参数接受指向成员函数\ascii{WasRun::testMethod}的指针。相比之前的测试用例，该测试用例可以驱动出部分实现，虽然进步甚微，但已迈出具有实质意义的第一步。
 
-\begin{diff}{test/mars/core/TestMethodSpec.cc}
+\begin{diff}{test/mars/core/WasRunSpec.cc}
 \begin{minicpp}
 #include <gtest/gtest.h>
 
@@ -199,11 +199,11 @@ TEST(WasRunSpec, make_sure_test_method_be_ran) {
 
 \subsubsection{通过测试}
 
-不幸的是，\ascii{run}函数依赖于具体类型\ascii{WasRun}，而\ascii{WarRun}存在于匿名命名空间内。我们不期望将\ascii{WasRun}搬迁至产品实现中，毕竟\ascii{WarRun}是一个用户自定义的测试用例。
+不幸的是，\ascii{run}函数依赖于具体类型\ascii{WasRun}，而\ascii{WasRun}存在于匿名命名空间内。我们不期望将\ascii{WasRun}搬迁至产品实现中，毕竟\ascii{WasRun}是一个用户自定义的测试用例。
 
 在不破坏匿名命名空间的封装性，且不将测试代码污染产品代码的前提之下，为了快速通过测试用例，姑且就近实现\ascii{run}函数。
 
-\begin{diff}{test/mars/core/TestMethodSpec.cc}
+\begin{diff}{test/mars/core/WasRunSpec.cc}
 \begin{minicpp}
 #include <gtest/gtest.h>
 
@@ -273,10 +273,10 @@ $ test/mars-test
 Running main() from gtest_main.cc
 [==========] Running 1 test from 1 test case.
 [----------] Global test environment set-up.
-[----------] 1 test from SimpleTest
-[ RUN      ] SimpleTest.make_sure_test_case_can_run_normally
-[       OK ] SimpleTest.make_sure_test_case_can_run_normally (0 ms)
-[----------] 1 test from SimpleTest (0 ms total)
+[----------] 1 test from WasRunSpec
+[ RUN      ] WasRunSpec.make_sure_test_method_be_ran
+[       OK ] WasRunSpec.make_sure_test_method_be_ran (0 ms)
+[----------] 1 test from WasRunSpec (0 ms total)
 
 [----------] Global test environment tear-down
 [==========] 1 test from 1 test case ran. (0 ms total)
@@ -327,8 +327,8 @@ output/
 
 设计的坏味道非常明显，\ascii{run}函数与\ascii{WasRun}类型强度耦合，不够泛化。不仅无法搬迁\ascii{run}函数到产品代码中，而且不易被其他测试用例复用。新增测试用例\ascii{WasSucc}时，不得不再次重复实现\ascii{run}函数的基本逻辑。
 
-\begin{nodiff}{test/mars/core/TestMethodSpec.cc}
-\begin{c++}
+\begin{diff}{test/mars/core/WasRunSpec.cc, test/mars/core/WasSuccSpec.cc}
+\begin{minicpp}
 #include <gtest/gtest.h>
 
 namespace {
@@ -340,7 +340,6 @@ namespace {
     }
   };
   
-  // Duplication!!!
   void run(WasRun& self, void(WasRun::*method)()) {
     (self.*method)();
   }
@@ -353,6 +352,10 @@ TEST(WasRunSpec, make_sure_test_method_be_ran) {
   run(test, &WasRun::testMethod);
   ASSERT_TRUE(test.wasRun);
 }
+\end{minicpp}
+\tcblower
+\begin{minicpp}
+#include <gtest/gtest.h>
 
 namespace {
   struct WasSucc {
@@ -363,7 +366,6 @@ namespace {
     }
   };
 
-  // Duplication!!!
   void run(WasSucc& self, void(WasSucc::*method)()) {
     (self.*method)();
   }
@@ -376,8 +378,8 @@ TEST(WasSuccSpec, make_sure_test_method_be_ran) {
   run(test, &WasSucc::testMethod);
   ASSERT_EQ("success", test.result);
 }
-\end{c++}
-\end{nodiff}
+\end{minicpp}
+\end{diff}
 
 虽然两个测试用例是通过的，但两个特化实现的\ascii{run}函数引入了明显的重复设计。为了消除两者实现的重复设计，提取公共的模板函数\ascii{run}，并搬迁至产品文件\ascii{TestMethod.h}之中。
 
@@ -464,31 +466,8 @@ void runX(Fixture& self, void(Fixture::*method)()) {
 
 \ascii{run}函数虽然已经泛化了，但是它仅仅实现了测试方法的间接调用，其职责也很鸡肋。再次深入分析客户现场，用户更期待能够直接执行\emph{测试方法}，并不期望还要负责创建和维护相关的\emph{测试对象}。重构既有测试用例使其失败，使其\ascii{run}函数不再依赖于具体的测试对象。
 
-\begin{diff}{test/mars/core/TestMethodSpec.cc}
-\begin{minicpp}
-#include <mars/core/TestMethod.h>
-#include <gtest/gtest.h>
-
-namespace {
-  struct WasRun {
-    bool wasRun = false;
-
-    void testMethod() {
-      wasRun = true;
-    }
-  };
-}
-
-TEST(WasRunSpec, make_sure_test_method_be_ran) {
-  WasRun test;
-
-  ASSERT_FALSE(test.wasRun);
-  run(test, &WasRun::testMethod);
-  ASSERT_TRUE(test.wasRun);
-}
-\end{minicpp}
-\tcblower
-\begin{minicpp}
+\begin{nodiff}{test/mars/core/WasRunSpec.cc}
+\begin{c++}
 #include <mars/core/TestMethod.h>
 #include <gtest/gtest.h>
 
@@ -507,8 +486,8 @@ TEST(WasRunSpec, make_sure_test_method_be_ran) {
   run(&WasRun::testMethod);
   ASSERT_TRUE(wasRun);
 }
-\end{minicpp}
-\end{diff}
+\end{c++}
+\end{nodiff}
 
 为了能够快速通过测试，泛化的\ascii{run}函数额外承担\emph{测试对象}创建和维护的职责。此处，\ascii{xUnit Mars}执行引擎与客户建立了一个隐式的契约关系：\emph{测试对象必须具有默认构造函数}，否则编译失败。目前，这个契约已经在\ascii{xUnit}社区得到了一致的认可。
 
@@ -558,7 +537,7 @@ void run(TestMethod<Fixture> method) {
 
 重构既有的测试用例，使其符合\ascii{OO}的调用风格。
 
-\begin{diff}{test/mars/WasSucc.cc}
+\begin{diff}{test/mars/core/WasSuccSpec.cc}
 \begin{minicpp}
 TEST(TestSuiteSpec, make_sure_test_method_be_ran) {
   auto test = &WasSucc::testMethod;
