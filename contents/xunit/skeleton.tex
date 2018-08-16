@@ -8,9 +8,9 @@
 
 \begin{content}
 
-本章接着驱动实现\ascii{xUnit Mars}引擎的关键路径，并试图推敲出一个测试用例在运行时的完整生命周期。此时，泛型实现的\ascii{TestMethod}也变得越发臃肿。尝试从泛型实现的\ascii{TestMethod}之中，抽取了非泛型实现的逻辑，并形成\ascii{TestCase}漂亮的模板方法，构建了用例执行的主干逻辑。此时，泛型实现的\ascii{TestMethod}退居\ascii{TestCase}的幕后默默地工作。
+本章接着驱动实现\ascii{xUnit Mars}引擎的关键路径，并试图推敲出测试用例在运行时执行的完整生命周期。此时，泛型实现的\ascii{TestMethod}也变得异常臃肿。尝试从泛型实现的\ascii{TestMethod}之中，抽取了非泛型实现的逻辑\ascii{TestCase}，并形成漂亮的模板方法，构建了用例执行的主干逻辑。此时，泛型实现的\ascii{TestMethod}退居\ascii{TestCase}幕后，为其默默地服务。
 
-将复杂的泛型实施封装和隐藏，对外提供非泛型的\ascii{TestCase}编程接口，极大地降低了系统的复杂度和编译时依赖，设计也变得越发有趣多了。
+将复杂的泛型实施封装和隐藏，对外提供非泛型的\ascii{TestCase}编程接口，极大地降低了系统的复杂度和编译时依赖，设计也变得越发有趣了。
 
 \end{content}
 
@@ -31,11 +31,11 @@
 
 namespace {
   bool wasRun = false;
-  bool wasSetUp = false;
+  @bool wasSetUp = false;@
 
   struct WasRun {
     void setUp() {
-      wasSetUp = true;
+@      wasSetUp = true;@
     }
 
     void testMethod() {
@@ -54,10 +54,10 @@ TEST(WasRunSpec, make_sure_test_method_be_ran) {
 
 TEST(WasRunSpec, make_sure_setup_was_ran) {
   TestMethod<WasRun> test(&WasRun::testMethod);
+@  ASSERT_FALSE(wasSetUp);@
 
-  ASSERT_FALSE(wasSetUp);
   test.run();
-  ASSERT_TRUE(wasSetUp);
+@  ASSERT_TRUE(wasSetUp);@
 }
 \end{c++}
 \end{nodiff}
@@ -66,8 +66,8 @@ TEST(WasRunSpec, make_sure_setup_was_ran) {
 
 逻辑较为简单，直接显式实现。此时运行测试，发现测试执行失败。
 
-\begin{diff}{include/mars/core/TestMethod.h}
-\begin{minicpp}
+\begin{nodiff}{include/mars/core/TestMethod.h}
+\begin{c++}
 template <typename Fixture>
 struct TestMethod {
 private:
@@ -78,6 +78,7 @@ public:
     : method(method) {}
 
   void run() {
+@    self.setUp();@
     (self.*method)();
   }
 
@@ -85,33 +86,12 @@ private:
   Fixture self;
   Method method;
 };
-\end{minicpp}
-\tcblower
-\begin{minicpp}
-template <typename Fixture>
-struct TestMethod {
-private:
-  using Method = void(Fixture::*)();
+\end{c++}
+\end{nodiff}
 
-public:
-  TestMethod(Method method)
-    : method(method) {}
+\subsubsection{修复缺陷}
 
-  void run() {
-    self.setUp();
-    (self.*method)();
-  }
-
-private:
-  Fixture self;
-  Method method;
-};
-\end{minicpp}
-\end{diff}
-
-\subsubsection{重置标记}
-
-简单分析，是因为测试之间产生了依赖。引入测试夹具\ascii{WasRunSpec}，在\ascii{SetUp}中重置\ascii{wasSetUp, wasRun}标记。
+简单分析，是因为测试之间产生了依赖。引入测试夹具\ascii{WasRunSpec}，在\ascii{SetUp}中重置\ascii{wasSetUp, wasRun}标记位。
 
 \begin{nodiff}{test/mars/core/TestMethodSpec.cc}
 \begin{c++}
@@ -132,17 +112,16 @@ namespace {
     }
   };
 
-  struct WasRunSpec : testing::Test {
-  private:
-    // IMPORTANT: should reset all flags.
-    void SetUp() override {
-      wasRun = false;
-      wasSetUp = false;
-    }
-  };
+@  struct WasRunSpec : testing::Test {@
+@  private:@
+@    void SetUp() override {@
+@      wasRun = false;@
+@      wasSetUp = false;@
+@    }@
+@  };@
 }
 
-TEST_F(WasRunSpec, make_sure_test_method_be_ran) {
+@TEST_F(WasRunSpec@, make_sure_test_method_be_ran) {
   TestMethod<WasRun> test(&WasRun::testMethod);
 
   ASSERT_FALSE(wasRun);
@@ -150,7 +129,7 @@ TEST_F(WasRunSpec, make_sure_test_method_be_ran) {
   ASSERT_TRUE(wasRun);
 }
 
-TEST_F(WasRunSpec, make_sure_setup_be_ran) {
+@TEST_F(WasRunSpec@, make_sure_setup_be_ran) {
   TestMethod<WasRun> test(&WasRun::testMethod);
 
   ASSERT_FALSE(wasSetUp);
@@ -192,24 +171,24 @@ namespace {
       wasSetUp = false;
     }
 
-  protected:
-    void makeSure(bool invoked) {
-      ASSERT_FALSE(invoked);
-      test.run();
-      ASSERT_TRUE(invoked);      
-    }
+@  protected:@
+@    void makeSure(bool invoked) {@
+@      ASSERT_FALSE(invoked);@
+@      test.run();@
+@      ASSERT_TRUE(invoked);@      
+@    }@
 
-  private:
-    TestMethod<WasRun> test = &WasRun::testMethod;
+@  private:@
+@    TestMethod<WasRun> test = &WasRun::testMethod;@
   };
 }
 
 TEST_F(WasRunSpec, make_sure_test_method_was_ran) {
-  makeSure(wasRun);
+@  makeSure(wasRun);@
 }
 
 TEST_F(WasRunSpec, make_sure_setup_was_ran) {
-  makeSure(wasSetUp);
+@  makeSure(wasSetUp);@
 }
 \end{c++}
 \end{nodiff}
@@ -230,17 +209,17 @@ TEST_F(WasRunSpec, make_sure_setup_was_ran) {
 namespace {
   bool wasRun;
   bool wasSetUp;
-  std::string result;
+@  std::string result;@
 
   struct WasRun {
     void setUp() {
       wasSetUp = true;
-      result += "setUp";
+@      result += "[setUp]";@
     }
 
     void testMethod() {
       wasRun = true;
-      result += "runTest";
+@      result += "[runTest]";@
     }
   };
 
@@ -249,7 +228,7 @@ namespace {
     void SetUp() override {
       wasRun = false;
       wasSetUp = false;
-      result.clear();
+@      result.clear();@
     }
 
   protected:
@@ -259,23 +238,17 @@ namespace {
       ASSERT_TRUE(invoked);      
     }
 
-  protected:
+@  protected:@
     TestMethod<WasRun> test = &WasRun::testMethod;
   };
 }
 
-TEST_F(WasRunSpec, make_sure_test_method_was_ran) {
-  makeSure(wasRun);
-}
+// ...
 
-TEST_F(WasRunSpec, make_sure_setup_was_ran) {
-  makeSure(wasSetUp);
-}
-
-TEST_F(WasRunSpec, should_setup_before_running_test) {
-  test.run();
-  ASSERT_EQ("[setUp][runTest]", result);
-}
+@TEST_F(WasRunSpec, should_setup_before_running_test) {@
+@  test.run();@
+@  ASSERT_EQ("[setUp][runTest]", result);@
+@}@
 \end{c++}
 \end{nodiff}
 
@@ -340,15 +313,15 @@ namespace {
     }
 
     void tearDown() {
-      result += "[tearDown]";
+@      result += "[tearDown]";@
     }
   };
 }
 
-TEST(WasRunSpec, full_life_cycle_for_test_case) {
+TEST(WasRunSpec, @full_life_cycle_for_test_case@) {
   TestMethod<WasRun> test(&WasRun::testMethod);
   test.run();
-  ASSERT_EQ("[setUp][runTest][tearDown]", result);
+@  ASSERT_EQ("[setUp][runTest][tearDown]", result);@
 }
 \end{c++}
 \end{nodiff}
@@ -357,8 +330,8 @@ TEST(WasRunSpec, full_life_cycle_for_test_case) {
 
 当用例执行完成后，\ascii{TestCase::tearDown}负责清理现场。
 
-\begin{diff}{include/mars/core/TestMethod.h}
- \begin{minicpp}
+\begin{nodiff}{include/mars/core/TestMethod.h}
+ \begin{c++}
 template <typename Fixture>
 struct TestMethod {
 private:
@@ -371,36 +344,15 @@ public:
   void run() {
     self.setUp();
     (self.*method)();
+@    self.tearDown();@
   }
 
 private:
   Fixture self;
   Method method;
 };
-  \end{minicpp}
-\tcblower
- \begin{minicpp}
-template <typename Fixture>
-struct TestMethod {
-private:
-  using Method = void(Fixture::*)();
-
-public:
-  TestMethod(Method method)
-    : method(method) {}
-
-  void run() {
-    self.setUp();
-    (self.*method)();
-    self.tearDown();
-  }
-
-private:
-  Fixture self;
-  Method method;
-};
-  \end{minicpp}
-\end{diff}
+  \end{c++}
+\end{nodiff}
 
 \subsection{连理分枝}
 
@@ -508,7 +460,7 @@ TRAIT(SelfDescribing) {
 
 \begin{nodiff}{test/mars/core/TestMethodSpec.cc}
  \begin{c++}
-#include "mars/core/TestCase.h"
+#include <mars/core/TestCase.h>
 #include <gtest/gtest.h>
 
 namespace {
@@ -622,7 +574,7 @@ private:
 
 \begin{content}
 
-存在一个陷阱，存在一个失败的测试用例。因为\ascii{TestMethod}要求\ascii{WasSucc}存在公开的\ascii{setUp, tearDown}成员函数，但\ascii{WasSucc}刚好缺失。
+存在一个编译失败的测试用例，因为\ascii{TestMethod}要求\ascii{WasSucc}存在公开的\ascii{setUp, tearDown}成员函数，但\ascii{WasSucc}刚好缺失。
 
 \begin{nodiff}{test/mars/core/WasSuccSpec.cc}
 \begin{c++}
@@ -660,15 +612,15 @@ namespace {
   bool wasSucc = false;
 
   struct WasSucc {
-    void setUp() {
-    }
+@    void setUp() {@
+@    }@
 
     void testMethod() {
       wasSucc = true;
     }
 
-    void tearDown() {
-    }
+@    void tearDown() {@
+@    }@
   };
 }
 
@@ -690,8 +642,7 @@ TEST(WasSuccSpec, make_sure_test_running_be_succ) {
 \begin{c++}
 struct TestFixture {
   virtual void setUp() {}
-  virtual void tearDown() {}
-  
+  virtual void tearDown() {}  
   virtual ~TestFixture() {}
 };
 \end{c++}
@@ -708,15 +659,15 @@ namespace {
   bool wasSucc = false;
 
   struct WasSucc {
-    void setUp() {
-    }
+@    void setUp() {@
+@    }@
 
     void testMethod() {
       wasSucc = true;
     }
 
-    void tearDown() {
-    }
+@    void tearDown() {@
+@    }@
   };
 }
 
@@ -735,7 +686,7 @@ TEST(WasSuccSpec, make_sure_test_running_is_succ) {
 namespace {
   bool wasSucc = false;
 
-  struct WasSucc : TestFixture {
+  struct WasSucc : @TestFixture@ {
     void testMethod() {
       wasSucc = true;
     }
@@ -791,7 +742,7 @@ namespace {
   std::string result;
 
   struct WasRun : TestFixture {
-    void setUp() override {
+    void setUp() @override@ {
       result += "[setUp]";
     }
 
@@ -799,7 +750,7 @@ namespace {
       result += "[runTest]";
     }
 
-    void tearDown() override {
+    void tearDown() @override@ {
       result += "[tearDown]";
     }
   };
@@ -825,16 +776,16 @@ struct TestCase {
   virtual ~TestCase() {}
 
 private:
-  virtual void setUp() {}
+@  virtual void setUp() {}@
   virtual void runTest() {}
-  virtual void tearDown() {}
+@  virtual void tearDown() {}@
 };
   \end{minicpp}
 \tcblower
  \begin{minicpp}
 #include <mars/core/TestFixture.h>
 
-struct TestCase : private TestFixture {
+struct TestCase : @private TestFixture@ {
   void run();
 
 private:
@@ -847,7 +798,7 @@ private:
 
 抽象的\ascii{TestFixture}，具有运行时多态的特性，可注入到\ascii{TestCase}之中。但是，当被注入到\ascii{WasSucc}之中，被\ascii{TestMethod}按照''鸭子编程''的方式被静态调用。当用户需要重写\ascii{setUp, tearDown}时，用户则不得不\ascii{public}该\ascii{override}实现函数。
 
-仔细推敲，\ascii{TestMethod}中直接基于模板参数\ascii{Fixture}进行编程，违反了''按照接口编程''的设计原则。因此，在\ascii{TestMethod}中增加\code{TestFixture& fixture = self}类内初始化语句，使得调用\ascii{setUp, tearDown}时基于抽象的\ascii{TestFixture}接口类型实现运行时多态。而\code{(self.*method)()}则使用具体的子类型实现编译时多态。动静相辅、协同工作，充分体现了\ascii{C++}无以伦比的设计美感。
+仔细推敲，\ascii{TestMethod}中直接基于模板参数\ascii{Fixture}进行编程，违反了“按照接口编程”的设计原则。因此，在\ascii{TestMethod}中增加\code{TestFixture& fixture = self}类内初始化语句，使得调用\ascii{setUp, tearDown}时基于抽象的\ascii{TestFixture}接口类型实现运行时多态。而\code{(self.*method)()}则使用具体的子类型实现编译时多态。动静相辅、协同工作，充分体现了\ascii{C++}无以伦比的设计美感。
 
 \begin{nodiff}{include/mars/core/TestMethod.h}
  \begin{c++}
@@ -864,20 +815,20 @@ public:
 
 private:
   void setUp() override {
-    fixture.setUp();
+@    fixture.setUp();@
   }
 
   void runTest() override {
     (self.*method)();
   }
   void tearDown() override {
-    fixture.tearDown();
+@    fixture.tearDown();@
   }
 
 private:
   Fixture self;
   Method method;
-  TestFixture& fixture = self;
+@  TestFixture& fixture = self;@
 };
   \end{c++}
 \end{nodiff}
@@ -897,7 +848,7 @@ namespace {
       result += "[runTest]";
     }
 
-  private:
+@  private:@
     void setUp() override {
       result += "[setUp]";
     }
@@ -926,7 +877,7 @@ TEST(WasRunSpec, full_life_cycle_for_test_case) {
 
 \subsubsection{测试用例}
 
-相对于模板方法，此处需要额外地引入\ascii{TestCaseRunner}。
+相对于模板方法，策略模式需要额外地引入\ascii{TestCaseRunner}。
 
 \begin{diff}{test/mars/core/TestCaseSpec.cc(左：模板方法；右：策略模式)}
  \begin{minicpp}
@@ -954,7 +905,7 @@ namespace {
 
 TEST(WasRunSpec, full_life_cycle_for_test_case) {
   WasRun test;
-  test.run();
+  @test.run();@
   ASSERT_EQ("[setUp][runTest][tearDown]", test.result);
 } 
   \end{minicpp}
@@ -984,7 +935,7 @@ namespace {
 
 TEST(WasRunSpec, full_life_cycle_for_test_case) {
   WasRun test;
-  TestRunner(test).run();
+  @TestRunner(test).run();@
   ASSERT_EQ("[setUp][runTest][tearDown]", test.result);
 }
  \end{minicpp} 
@@ -1012,29 +963,26 @@ TEST(WasRunSpec, full_life_cycle_for_test_case) {
 
 \begin{diff}{include/mars/core/TestCase.h(左：模板方法；右：策略模式)}
  \begin{minicpp}
-struct TestCase {
-  void run();  
+#include <mars/core/TestFixture.h>
+
+struct TestCase : private TestFixture {
+@  void run();@
   virtual ~TestCase() {}
   
-private:
-  virtual void setUp() {}
+@private:@
   virtual void runTest() {}
-  virtual void tearDown() {}
 };
 \end{minicpp}
 \tcblower
  \begin{minicpp}
-struct TestCase {
-  virtual void setUp() {}
+struct TestCase : TestFixture {
   virtual void runTest() {}
-  virtual void tearDown() {}
-
   virtual ~TestCase() {}
 }; 
 
 struct TestCaseRunner {
   TestCaseRunner(TestCase& test);
-  void run();
+@  void run();@
 
 private:
   TestCase& test;
@@ -1046,7 +994,7 @@ private:
  \begin{minicpp}
 #include "mars/core/TestCase.h"
 
-void TestCase::run() {
+@void TestCase::run() {@
   setUp();
   runTest();
   tearDown();
@@ -1059,7 +1007,7 @@ void TestCase::run() {
 TestCaseRunner::TestCaseRunner(TestCase& test)
   : test(test) {}
 
-void TestCaseRunner::run() {
+@void TestCaseRunner::run() {@
   test.setUp();
   test.runTest();
   test.tearDown();
@@ -1103,7 +1051,7 @@ void TestCaseRunner::run() {
 
 如果优选模板方法，因引入继承从而增强了\ascii{TestCase}与\ascii{WasRun}的耦合关系。考虑到\ascii{WasRun}是\ascii{xUnit Mars}最小调度单位，相对稳定，变化不大。也就是说，两者之间的耦合关系仅局部于\ascii{WasRun}内部，不会被传播到其他地方，满足局部化原则，这是完全可以接受的设计。
 
-结论：此时此例，优选\emph{模板方法}，而不是\emph{策略}。
+结论：此例优选\emph{模板方法}，而非\emph{策略}。因为委托增加冗余的中间层，反而引入不必要的中间人。而继承消除了中间人，设计更为直接。有的读者可能读过相关设计书，常常以偏概全完全否定继承。殊不知，“委托优于继承”的适用场景也存在上下文，也不是解决问题唯一的银弹。
 
 \begin{episode}{struct与class}
 \begin{content}
@@ -1132,7 +1080,7 @@ struct Rectangle {
 \begin{c++}
 Rectangle r;
 
-r.width = 2;
+r.width = 2;@
 r.heigth = 4;
 
 bool area = r.width * r.height;
@@ -1192,7 +1140,7 @@ struct Rectangle {
 
 \begin{c++}
 class Runnable {
-public:
+@public:@
   virtual void run() = 0;
   virtual ~Runnable() {}
 };
@@ -1210,11 +1158,11 @@ struct Runnable {
 \subsubsection{继承时的差异}
 
 \begin{c++}
-class TestCase : TestFixture, public Test {
+class TestCase : TestFixture, @public@ Test {
   // ...
 };
 
-struct TestCase : private TestFixture, Test {
+struct TestCase : @private@ TestFixture, Test {
   // ...  
 };
 \end{c++}
@@ -1225,7 +1173,7 @@ struct TestCase : private TestFixture, Test {
 
 \begin{c++}
 class TestCase : TestFixture, public Test {
-  std::string name;
+@  std::string name;@
 
 public:
   explicit TestCase(const std::string& name);
@@ -1234,8 +1182,8 @@ public:
 struct TestCase : private TestFixture, Test {
   explicit TestCase(const std::string& name);
 
-private:
-  std::string name;
+@private:@
+@  std::string name;@
 };
 \end{c++}
 

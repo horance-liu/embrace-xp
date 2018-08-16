@@ -132,7 +132,7 @@ private:
 
 \subsubsection{通过测试}
 
-在\ascii{TestSuite.h}中设计最简单的私有数据结构。因为\ascii{TestSuite}强依赖于\ascii{std::vector}的值类型，因此需要包含头文件\ascii{#include <vector>}。在实现文件中，可以快速显式实现\ascii{TestSuite::run}的逻辑。
+在\ascii{TestSuite.h}中设计最简单的私有数据结构。因为\ascii{TestSuite}强依赖于\ascii{std::vector}的值类型，因此需要包含头文件\ascii{<vector>}。在实现文件中，可以快速显式实现\ascii{TestSuite::run}的逻辑。
 
 \begin{diff}{src/mars/core/TestSuite.cc}
  \begin{minicpp}
@@ -256,7 +256,7 @@ TEST(ScopedExitSpec, delete_memeory_safely) {
 struct TestCase;
 
 struct TestSuite {
-  ~TestSuite();
+@  ~TestSuite();@
 
   void add(TestCase* test);
   void run();
@@ -273,11 +273,11 @@ void TestSuite::add(TestCase* test) {
   tests.push_back(test);
 }
 
-TestSuite::~TestSuite() {
-  for (auto test : tests) {
-    delete test;
-  }
-}
+@TestSuite::~TestSuite() {@
+@  for (auto test : tests) {@
+@    delete test;@
+@  }@
+@}@
 
 void TestSuite::run() {
   for (auto test : tests) {
@@ -319,9 +319,9 @@ struct TestSuite {
   void add(TestCase* test);
   void run();
 
-private:
-  template <typename F>
-  void foreach(F f) const;
+@private:@
+@  template <typename F>@
+@  void foreach(F f) const;@
 
 private:
   std::vector<TestCase*> tests;
@@ -361,23 +361,23 @@ void TestSuite::add(TestCase* test) {
   tests.push_back(test);
 }
 
-template <typename F>
-inline void TestSuite::foreach(F f) const {
-  for (auto test : tests) {
-    f(test);
-  }
-}
+@template <typename F>@
+@inline void TestSuite::foreach(F f) const {@
+@  for (auto test : tests) {@
+@    f(test);@
+@  }@
+@}@
 
 TestSuite::~TestSuite() {
-  foreach([](auto test) {
-    delete test;
-  });
+@  foreach([](auto test) {@
+@    delete test;@
+@  });@
 }
 
 void TestSuite::run() {
-  foreach([](auto test) {
-    test->run();
-  });
+@  foreach([](auto test) {@
+@    test->run();@
+@  });@
 }
  \end{minicpp}
 \end{diff}
@@ -450,7 +450,7 @@ void TestSuite::run() {
 
 template <typename F>
 void TestSuite::foreach(F f) {
-  std::for_each(tests.begin(), test.end(), f);
+@  std::for_each(tests.begin(), test.end(), f);@
 }
 
 TestSuite::~TestSuite() {
@@ -472,9 +472,9 @@ void TestSuite::run() {
 
 template <typename F>
 void TestSuite::foreach(F f) {
-  for (auto test : tests) {
-    f(*test);
-  }
+@  for (auto test : tests) {@
+@    f(*test);@
+@  }@
 }
 
 TestSuite::~TestSuite() {
@@ -604,7 +604,7 @@ namespace {
   };
 }
 
-TEST_F(TestSuiteSpec, pack_test_cases_into_test_suite) {
+TEST(TestSuiteSpec, pack_test_cases_into_test_suite) {
   TestSuite suite;
   suite.add(new FooTest);
   suite.add(new FooTest);
@@ -630,15 +630,15 @@ namespace {
     }
   };
 
-  struct TestSuiteSpec : testing::Test {
-  private:
-    void SetUp() override {
-      num = 0;  // IMPORTANT: reset counter.
-    }
-  };
+@  struct TestSuiteSpec : testing::Test {@
+@  private:@
+@    void SetUp() override {@
+@      num = 0; @
+@    }@
+@  };@
 }
 
-TEST_F(TestSuiteSpec, pack_test_cases_into_test_suite) {
+@TEST_F(TestSuiteSpec@, pack_test_cases_into_test_suite) {
   TestSuite suite;
   suite.add(new FooTest);
   suite.add(new FooTest);
@@ -881,7 +881,7 @@ private:
 #include <mars/core/TestFixture.h>
 
 struct TestCase : private TestFixture {
-  void run();
+@  void run();@
 
 private:
   virtual void runTest() {}
@@ -892,14 +892,12 @@ private:
 #include <mars/core/Test.h>
 #include <mars/core/TestFixture.h>
 
-struct TestCase : Test, private TestFixture {
-private:
-  void run() override;
+struct TestCase : @Test@, private TestFixture {
+@private:@
+@  void run() override;@
 
 private:
-  virtual void setUp() {}
   virtual void runTest() {}
-  virtual void tearDown() {}
 };
  \end{minicpp}
 \end{diff}
@@ -912,20 +910,20 @@ private:
  \begin{minicpp}
 #include <vector>
 
-struct TestCase;
+@struct TestCase;@
 
 struct TestSuite {
   ~TestSuite();
 
-  void add(TestCase* test);
-  void run();
+  void add(@TestCase@* test);
+@  void run();@
 
 private:
   template <typename F>
   void foreach(F f) const;
 
 private:
-  std::vector<TestCase*> tests;
+  std::vector<@TestCase@*> tests;
 };
  \end{minicpp}
 \tcblower
@@ -935,17 +933,17 @@ private:
 
 struct TestSuite : Test {
   ~TestSuite();
-  void add(Test* test);
+  void add(@Test@* test);
 
-private:
-  void run() override;
+@private:@
+@  void run() override;@
 
 private:
   template <typename F>
   void foreach(F f) const;
 
 private:
-  std::vector<Test*> tests;
+  std::vector<@Test@*> tests;
 };
  \end{minicpp}
 \end{diff}
@@ -957,7 +955,7 @@ private:
 #include <mars/core/TestSuite.h>
 #include <mars/core/TestCase.h>
 
-void TestSuite::add(TestCase* test) {
+void TestSuite::add(@TestCase@* test) {
   tests.push_back(test);
 }
 
@@ -984,7 +982,7 @@ void TestSuite::run() {
  \begin{minicpp}
 #include <mars/core/TestSuite.h>
 
-void TestSuite::add(Test* test) {
+void TestSuite::add(@Test@* test) {
   tests.push_back(test);
 }
 
@@ -1030,19 +1028,19 @@ void TestSuite::run() {
 
 \begin{nodiff}{test/mars/core/TestCaseSpec.cc}
  \begin{c++}
-#include <gtest/gtest.h>
 #include <mars/core/TestCase.h>
+#include <gtest/gtest.h>
 
-TEST(NamedTestCase, named_test_case) {
-  TestCase test("test case")
-  assertName("test case", test.getName());
+TEST(NamedTestSpec, named_test_case) {
+  TestCase test("test case");
+  ASSERT_EQ("test case", test.getName());
 }
  \end{c++}
 \end{nodiff}
 
 \subsubsection{重构TestCase}
 
-在\ascii{TestCase}中覆写\ascii{getName}成员函数。其中，为默认构造函数提供空字符串，保证既有的用例都能通过。
+在\ascii{TestCase}中增加\ascii{getName}成员函数。其中，为默认构造函数提供空字符串，保证既有的用例都能通过。
 
 \begin{diff}{include/mars/core/TestCase.h}
  \begin{minicpp}
@@ -1063,8 +1061,8 @@ private:
 #include <mars/core/TestFixture.h>
 
 struct TestCase : Test, private TestFixture {
-  explicit TestCase(const std::string& = "");
-  const std::string& getName() const;
+@  explicit TestCase(const std::string& = "");@
+@  const std::string& getName() const;@
 
 private:
   void run() override;
@@ -1073,7 +1071,7 @@ private:
   virtual void runTest() {}
 
 private:
-  std::string name;
+@  std::string name;@
 };
  \end{minicpp}
 \end{diff}
@@ -1094,12 +1092,12 @@ void TestCase::run() {
  \begin{minicpp}
 #include <mars/core/TestCase.h>
 
-TestCase::TestCase(const std::string& name)
-  : name(name) {}
+@TestCase::TestCase(const std::string& name)@
+@  : name(name) {}@
 
-const std::string& TestCase::getName() const {
-  return name;
-}
+@const std::string& TestCase::getName() const {@
+@  return name;@
+@}@
 
 void TestCase::run() {
   setUp();
@@ -1117,8 +1115,8 @@ void TestCase::run() {
 
 \begin{nodiff}{test/mars/core/TestSuiteSpec.cc}
  \begin{c++}
-#include <gtest/gtest.h>
 #include <mars/core/TestSuite.h>
+#include <gtest/gtest.h>
 
 TEST(NamedTestSuite, named_test_suite) {
   TestSuite suite("test suite")
@@ -1157,10 +1155,10 @@ private:
 #include <mars/core/Test.h>
 
 struct TestSuite : Test {
-  explicit TestSuite(const std::string& = "");
+@  explicit TestSuite(const std::string& = "");@
   ~TestSuite();
 
-  const std::string& getName() const;
+@  const std::string& getName() const;@
   void add(Test* test);
 
 private:
@@ -1171,7 +1169,7 @@ private:
   void foreach(F f) const;
 
 private:
-  std::string name;
+@  std::string name;@
   std::vector<Test*> tests;
 };
  \end{minicpp}
@@ -1210,12 +1208,12 @@ void TestSuite::run() {
  \begin{minicpp}
 #include <mars/core/TestSuite.h>
 
-TestSuite::TestSuite(const std::string& name)
-  : name(name) {}
+@TestSuite::TestSuite(const std::string& name)@
+@  : name(name) {}@
 
-const std::string& TestSuite::getName() const {
-  return name;
-}
+@const std::string& TestSuite::getName() const {@
+@  return name;@
+@}@
 
 void TestSuite::add(Test* test) {
   tests.push_back(test);
@@ -1264,14 +1262,14 @@ struct Test {
 #include <string>
 
 struct Test {
-  explicit Test(const std::string& name = "");
-  const std::string& getName() const;
+@  explicit Test(const std::string& name = "");@
+@  const std::string& getName() const;@
 
   virtual void run() = 0;
   virtual ~Test() {}
 
 private:
-  std::string name;
+@  std::string name;@
 };
  \end{minicpp}
 \end{diff}
@@ -1282,12 +1280,12 @@ private:
  \begin{c++}
 #include <mars/core/Test.h>
 
-Test::Test(const std::string& name)
-  : name(name) {}
+@Test::Test(const std::string& name)@
+@  : name(name) {}@
 
-const std::string& Test::getName() const {
-  return name;
-}
+@const std::string& Test::getName() const {@
+@  return name;@
+@}@
  \end{c++}
 \end{nodiff}
 
@@ -1300,8 +1298,8 @@ const std::string& Test::getName() const {
 #include <mars/core/Test.h>
 
 struct TestCase : Test {
-  explicit TestCase(const std::string& = "");
-  const std::string& getName() const;
+@  explicit TestCase(const std::string& = "");@
+@  const std::string& getName() const;@
 
 private:
   void run() override;
@@ -1310,7 +1308,7 @@ private:
   virtual void runTest() {}
 
 private:
-  std::string name;  
+@  std::string name;@
 };
  \end{minicpp}
 \tcblower
@@ -1318,7 +1316,7 @@ private:
 #include <mars/core/Test.h>
 
 struct TestCase : Test {
-  using Test::Test;
+@  using Test::Test;@
 
 private:
   void run() override;
@@ -1339,10 +1337,10 @@ private:
 #include <mars/core/Test.h>
 
 struct TestSuite : Test {
-  explicit TestSuite(const std::string& = "");
+@  explicit TestSuite(const std::string& = "");@
   ~TestSuite();
 
-  const std::string& getName() const;
+@  const std::string& getName() const;@
   void add(Test*);
 
 private:
@@ -1353,7 +1351,7 @@ private:
   void foreach(F f) const;
 
 private:
-  std::string name;
+@  std::string name;@
   std::vector<Test*> tests;
 };
  \end{minicpp}
@@ -1363,7 +1361,7 @@ private:
 #include <mars/core/Test.h>
 
 struct TestSuite : Test {
-  using Test::Test;
+@  using Test::Test;@
   ~TestSuite();
 
   void add(Test*);
@@ -1448,8 +1446,8 @@ private:
 
 \begin{c++}[title={\ttfamily{坏味道：冗长，难以区分}}]
 // Bad Smell
-struct ControllerForEfficientHandlingOfStrings {};
-struct ControllerForEfficientStorageOfStrings {};
+struct ControllerForEfficient@Handling@OfStrings {};
+struct ControllerForEfficient@Storage@OfStrings {};
 \end{c++}
 
 \emph{一般地，名字长度与作用域的大小成正比}。如果是一个名字暴露在全局命名空间，则需要适当增加名字长度，防止名字冲突。相反地，在函数内可见的局部变量，尤其在一个短小的\ascii{for}循环作用域内，没必要取长的名字。
@@ -1457,7 +1455,7 @@ struct ControllerForEfficientStorageOfStrings {};
  \begin{c++}[title={\ttfamily{坏味道：使用index命名循环变量}}]
 // Bad Smell
 void MutilTestListener::onTestStarted() {
-  for(int index=0; index!=listeners.size(); index++) {
+  for(int @index@=0; @index@!=listeners.size(); @index@++) {
     listeners[index].onTestStarted();
   }
 }
@@ -1466,7 +1464,7 @@ void MutilTestListener::onTestStarted() {
  \begin{c++}[title={\ttfamily{重构：使用i命名循环变量}}]
 // Good
 void MutilTestListener::onTestStarted() {
-  for(int i=0; i!=listeners.size(); i++) {
+  for(int @i@=0; @i@!=listeners.size(); @i@++) {
     listeners[i].onTestStarted();
   }
 }
@@ -1489,7 +1487,7 @@ void MutilTestListener::onTestStarted() {
 
 \begin{c++}[title={\ttfamily{匈牙利命名: 枚举类型}}]
 // Bad Smell
-enum EUsdUnit {
+enum @E@UsdUnit {
   DOLLAR,
   CENT,
 };
@@ -1499,16 +1497,16 @@ enum EUsdUnit {
 
 \begin{c++}[title={\ttfamily{匈牙利命名: 枚举类型重构为类类型}}]
 // Bad Smell: should rename EUsdUnit to CUsdUnit.
-struct CUsdUnit {
+struct @C@UsdUnit {
   virtual std::string toString() const = 0;
   virtual ~CUsdUnit() {}
 
-  static const CUsdUnit& dollar();
-  static const CUsdUnit& cent();
+  static const @C@UsdUnit& dollar();
+  static const @C@UsdUnit& cent();
 };
 
-#define DOLLAR CUsdUnit::dollar()
-#define CENT   CUsdUnit::cent()
+#define DOLLAR @C@UsdUnit::dollar()
+#define CENT @C@UsdUnit::cent()
 \end{c++}
 
 珍爱生命，远离匈牙利命名！
