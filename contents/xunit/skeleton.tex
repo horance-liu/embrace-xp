@@ -398,11 +398,11 @@ void TestCase::run() {
 \begin{episode}{虚拟析构函数}
 \begin{content}
 
-一般地，需要为\emph{多态基类}声明虚拟析构函数；否则，会招致运行时不可预期的行为。一般地，如果一个类包含虚函数时，便将其析构函数声明为虚拟的。
+一般地，需要为\emph{多态基类}声明虚拟析构函数；否则，会招致运行时不可预期的行为。如果一个类包含虚函数时，便将其析构函数声明为虚拟的。幸运的是，在此场景下，如果遗漏声明虚拟析构函数，主流\ascii{IDE}和\cpp{}编译器，都会提示警告信息。
 
 \subsubsection{空实现}
 
-但是，为每个接口类型实现一个空的虚拟析构函数，显得重复而且麻烦。可以引入一个宏定义，自动引入空实现的虚拟析构函数。
+但是，为每个接口类型实现一个空的虚拟析构函数，显然是一种重复设计。可以引入一个宏定义，自动引入空实现的虚拟析构函数。
 
  \begin{c++}
 namespace details {
@@ -416,7 +416,7 @@ namespace details {
 #define EXTENDS(...) , ##__VA_ARGS__
  \end{c++}
 
-例如，使用\ascii{TRAIT}宏\footnote{借鉴于\ascii{Scala}语言的关键字\ascii{trait}。使用\ascii{TRAIT}定义接口，一则相比使用宏定义\ascii{INTERFACE}，极大地降低名字冲突的可能性；二则\ascii{TRAIT}倡导\ascii{Mixin}组合式的设计方法，有别于传统意义的继承方法。}，定义了一个接口类型\ascii{SelfDescribing}，它自动拥有虚拟析构函数的默认空实现。
+例如，定义了一个接口类型\ascii{SelfDescribing}，使用\ascii{TRAIT}宏，便自动拥有虚拟析构函数的默认空实现\footnote{借鉴于\ascii{Scala}语言的关键字\ascii{trait}。使用\ascii{TRAIT}定义接口，一则相比使用宏定义\ascii{INTERFACE}，极大地降低名字冲突的可能性；二则\ascii{TRAIT}倡导\ascii{Mixin}组合式的设计方法，有别于传统意义的继承方法。}。
 
  \begin{c++}
 struct Description;
@@ -428,13 +428,13 @@ TRAIT(SelfDescribing) {
 
 \subsubsection{抽象函数}
 
-此外，定义纯虚函数时，常常会遗忘后面的\ascii{0}。可以引入另外一个宏定义。
+定义纯虚函数时，常常会遗忘后面的\ascii{0}。可以引入另外一个宏定义。
 
  \begin{c++}
 #define ABSTRACT(...) virtual __VA_ARGS__ = 0
  \end{c++}
 
-使用\ascii{ABSTRACT}定义，不仅可以抑制不经意地遗漏\ascii{0}的错误，也可以改善\ascii{API}的意图和可读性。
+使用\ascii{ABSTRACT}定义，不仅可以抑制不经意地遗漏\ascii{= 0}的错误，也可以改善\ascii{API}的意图和可读性。例如：
 
 \begin{c++}
 struct Description;
@@ -485,15 +485,104 @@ TEST(WasRunSpec, make_sure_test_method_be_ran) {
 \begin{episode}{private与override}
 \begin{content}
 
-在面向对象程序设计中，需遵循“按接口类型编程”的基本设计原则。在\ascii{C++}设计语言中，基类使用虚函数声明抽象函数，子类使用\ascii{override}覆写虚函数。在编译时，编译器按照基类的接口类型确定函数调用关系。而在运行时，根据对象的具体类型在相应的虚表中检索对应的成员函数，完成运行时多态的调用。
+在\ascii{C++}设计语言中，基类使用虚函数声明抽象函数，子类使用\ascii{override}覆写虚函数。在编译时，编译器按照基类的接口类型确定函数调用关系。而在运行时，根据对象的具体类型在相应的虚表中检索对应的成员函数，完成运行时多态的调用。
+
+\subsubsection{编译时安全}
+
+在\ascii{C++98}时代，编译期并不能提供\ascii{override}的编译时安全检查。当子类覆写父类的成员函数时，程序员需要自行保证如下几个方面的一致性。也就是说，子类覆写父类的虚函数时，程序员是极其容易出错的。
+
+\begin{enum}
+  \eitem{父类成员函数声明为\ascii{virtual}；}
+  \eitem{子类成员函数的名字与父类保持一致；} 
+  \eitem{子类成员函数的参数数目、类型与父类保持一致；} 
+  \eitem{子类成员函数的\ascii{const}修饰符与父类保持一致；} 
+  \eitem{子类成员函数的返回值与父类保持兼容；} 
+  \eitem{子类成员函数的异常规范与父类保持兼容。}       
+\end{enum}
+
+更有甚者，在既有的继承体系结构下，因缺失编译时安全检查，任何重构都是极为危险的，包括重命名成员函数、删除新的成员函数、修改参数类型等。如果父类的成员函数声明为纯虚的，情况稍微好一些；因为缺失相应的成员函数，子类不能构造对象而编译时失败。但是，如果父类的成员函数仅被声明为普通的虚函数，重构极易出错。例如，\ascii{TestListener::onFailure}是一个普通的虚函数。
+
+\begin{c++}
+struct TestFailure;
+
+struct TestListener {
+  virtual void onFailure(const TestFailure&) {}
+  virtual ~TestListener() {}
+};
+\end{c++}
+
+假如已存在大量子类覆写\ascii{TestListener::onFailure}。例如，\ascii{TestStatus, TestCollector, TimeCollector, FailureList}等。当重命名\ascii{TestListener::onFailure}为\ascii{TestListener::addFailure}时，因程序员粗心大意，遗忘同步修改\ascii{TestStatus::onFailure}的名字。不幸的是，此时编译居然正常通过，缺陷顺利逃逸至测试环境。在最糟糕的情况下，如果确实测试覆盖，缺陷逃逸至生产环境。
+
+\ascii{C++11}提供了完备的编译时安全检查机制。只要将所有覆写的成员函数声明为\ascii{override}，重命名父类的虚函数时，只需按照编译的错误信息，逐一修改即可。\emph{编译时安全为重构提供了良好的基础设施，优秀的程序员善于借助编译时的安全机制，设计安全的代码结构，缩短错误的反馈周期。}
 
 \subsubsection{按接口编程}
 
-从抽象基类的视角看，子类的\ascii{override}函数实现只是它的实现细节而已，应该被声明为\ascii{private}。据此推出一个重要结论：\emph{除非存在特殊需求，都将\ascii{override}函数声明为\ascii{private}}。如此以明确对外声明，在编译时无法通过该具体类型直接调用\ascii{override}函数，而推荐使用抽象的基类型，在运行时完成多态调用。
+在面向对象程序设计中，遵循“按接口编程”的基本设计原则，是一条久经考验的经典实践。客户代码依赖于抽象的接口类型，而不依赖于具体实现，实现了客户代码与具体实现之间的解耦，使得客户代码与具体实现能够独立变化，互不影响。
+
+从抽象基类的视角看，子类的\ascii{override}函数实现仅是实现细节而已，应该被声明为\ascii{private}。据此推出一个重要结论：\emph{将\ascii{override}函数声明为\ascii{private}}。如此以明确对外声明，在编译时无法通过该具体的子类型直接调用\ascii{override}函数，而强迫客户使用抽象的基类型，在运行时完成多态调用，实现客户代码与具体子类实现的解耦。
+
+\begin{c++}
+#include <mars/core/TestListener.h>
+
+struct TestStatus : TestListener {
+  TestStatus();
+  bool successful() const;
+
+@private:@
+  void addFailure(const TestFailure&) @override@;
+
+private:
+  bool succ;
+};
+\end{c++}
 
 \subsubsection{例外}
 
-凡事都存在例外，被覆写的析构函数就不应该声明为\ascii{private}；否则，无法生成该类型的值对象，否则无法析构该值对象。
+凡事都存在例外，\emph{被覆写的析构函数不应该声明为\ascii{private}}。否则，因为不能析构该对象，编译时拒绝生成该类型的对象。按照个人习惯，不太愿意使用\ascii{override}修饰析构函数。毕竟，子类与父类的名字不径相同，完全没有必要。
+
+另外，当覆写的成员函数需要被其他组件复用时，也不应该声明为\ascii{private}。应根据具体场景，灵活控制访问权限。例如，在一个三层的继承层次中，最底层的子类需要复用中间层的代码实现。此时，将中间层的\ascii{override}函数声明\ascii{protected}则是完全合理的。如下代码示例，\ascii{TestStatus}存在一个\ascii{override}的成员函数\ascii{addFailure}，它被声明为\ascii{protected}。
+
+\begin{c++}
+#include <mars/core/TestListener.h>
+
+struct TestStatus : TestListener {
+  TestStatus();
+  bool successful() const;
+
+@protected:@
+  void addFailure(const TestFailure&) @override@;
+
+private:
+  bool succ;
+};
+\end{c++}
+
+\ascii{TestCollector}继承\ascii{TestStatus}的实现，重新覆写成员函数\ascii{addFailure}。
+
+\begin{c++}
+#include <mars/listener/collector/TestStatus.h>
+
+struct TestCollector : @TestStatus@ {
+  int failCount() const;
+  int errorCount() const;
+
+@private:@
+  void addFailure(const TestFailure&) @override@;
+
+private:
+  int numOfFails = 0;
+  int numOfErrors = 0;
+};
+\end{c++}
+
+在\ascii{TestCollector::addFailure}的实现中，显式地复用了\ascii{TestStatus::addFailure}的实现，这便是\ascii{TestStatus::addFailure}被声明为\ascii{protected}的原因所在。
+
+\begin{c++}
+void TestCollector::addFailure(const TestFailure& f) {
+  @TestStatus::addFailure(f);@
+  f.isFailure() ? numOfFails++ : numOfErrors++;
+}
+\end{c++}
 
 \end{content}
 \end{episode}

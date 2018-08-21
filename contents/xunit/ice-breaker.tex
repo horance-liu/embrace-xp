@@ -41,7 +41,7 @@
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.6\textwidth]{figures/xunit/mars-project.png}
+\includegraphics[width=0.5\textwidth]{figures/xunit/mars-project.png}
 \caption{xUnit Mars: 项目组织}
  \label{fig:mars-project}
 \end{figure}
@@ -273,24 +273,6 @@ $ git commit -m"pass first test case"
  \end{c++}
 \end{nodiff}
 
-\begin{episode}{懒惰、缺乏耐心和傲慢}
-\begin{content}
-
-\ascii{Perl}设计者\ascii{Larry Wall}在著作\ascii{Programming Perl}中提到：
-优秀的程序员具有三大美德: 懒惰(\ascii{Laziness})、缺乏耐心(\ascii{Impatience})和傲慢(\ascii{Hubris})。详细解释，请见\refig{larry-wall}。
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.9\textwidth]{figures/xunit/larry-wall.png}
-\caption{程序员的三大美德: 懒惰、缺乏耐心和傲慢}
- \label{fig:larry-wall}
-\end{figure}
-
-优秀的程序员总是设法寻找高效的工作方法，并将其成为工作中的习惯。因为懒惰，程序员痛恨机械的重复工作，而追求程序自动实现；因为缺乏耐心，程序员痛恨蜗牛的计算速度，而追求程序风驰电掣；因为傲慢，程序员痛恨肮脏的实现代码，而追求程序至善至美。
-
-\end{content}
-\end{episode}
-
 \begin{episode}{全局忽略模式}
 \begin{content}
 
@@ -298,23 +280,17 @@ $ git commit -m"pass first test case"
 
 但是，为每个项目都创建一个\ascii{.gitignore}文件，显然是一种重复设计。因此，配置全局忽略模式是一个更恰当的解决方案。
 
- \begin{c++}
+ \begin{java}
 $ git config --global core.excludesfile ~/.gitignore_global
 $ vi ~/.gitignore_global
 # cmake
 build/
 
-# vi
-*.swp
-
 # eclipse
 .project
 .cproject
 .settings/
-
-# tex
-output/
- \end{c++}
+ \end{java}
 
 \end{content}
 \end{episode}
@@ -491,6 +467,30 @@ void run(void(Fixture::*method)()) {
 \end{c++}
 \end{nodiff}
 
+\begin{episode}{懒惰、缺乏耐心和傲慢}
+\begin{content}
+
+\ascii{Perl}设计者\ascii{Larry Wall}在著作\ascii{Programming Perl}中提到：
+优秀的程序员具有三大美德: 懒惰(\ascii{Laziness})、缺乏耐心(\ascii{Impatience})和傲慢(\ascii{Hubris})。详细解释，请见\refig{larry-wall}。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{figures/xunit/larry-wall.png}
+\caption{程序员的三大美德: 懒惰、缺乏耐心和傲慢}
+ \label{fig:larry-wall}
+\end{figure}
+
+优秀的程序员总是设法寻找高效的工作方法，并将其成为工作中的习惯。因为懒惰，程序员痛恨机械的重复工作，而追求程序自动实现；因为缺乏耐心，程序员痛恨蜗牛般的计算速度，而追求程序风驰电掣；因为傲慢，程序员痛恨肮脏的实现代码，而追求程序至善至美。
+
+软件设计是一门充满艺术气息的大学问。我身边不乏一批老成历练的资深程序员，他们身上都散发一种艺术家的气质。他们温文尔雅，可爱天真；他们普遍高学历高智商，拒绝平庸。对待代码，他们锲而不舍；对待工作，他们一丝不苟；对待生活，他们不乏情趣。
+
+自古人分为三六九等，社区也不乏一批不合格、不称职的程序员。移东篱，掩西障；拷贝粘贴，修修补补，便是他们日常的工作内容。苦嘲编程枯燥乏味而痛之，故障缠身而不能全然而退。一句忠告，人生苦短，远离代码，何必非得编程呢？
+
+任何优秀的程序员，都应该具有敏锐的嗅觉，绝不容忍设计的坏味道，这是优秀程序员一种内在的品味和特质。树立正确的价值观，保持积极的心态，热爱自己的职业，忠于自己的信念，编程自然是一件快乐而有意思的事情。
+
+\end{content}
+\end{episode}
+
 \subsection{引入别名}
 
 不幸的是，在\ascii{run}实现中，其参数类型声明为\code{void(Fixture::*method)()}，极其难于理解。一般地，对于指向成员函数的指针，常引入类型别名，提高其表达力。
@@ -507,6 +507,142 @@ void run(@TestMethod<Fixture> method@) {
 }
 \end{c++}
 \end{nodiff}
+
+\begin{episode}{类型别名}
+\begin{content}
+
+\emph{别名机制}是一种轻量级的抽象机制。一方面，使得用户依赖于更稳定的抽象；另一方面，可以极大地改善代码的可读性。例如，在标准库的\ascii{<string>}头文件中，\ascii{std::string}便是使用\ascii{typdef}定义的。
+
+\begin{c++}[title={\ttfamily{标准库: std::string与std::wstring}}]
+typedef basic_string<char> string;
+typedef basic_string<wchar_t> wstring;
+\end{c++}
+
+如果强迫用户使用\code{std::basic\_string<char>}，而不是\ascii{std::string}，不仅增加了用户使用的负担，而且让客户代码充斥了不稳定的实现细节。
+
+\subsubsection{抽象升级}
+
+别名机制相对较为轻量，实现成本也不高。在没有充分理由引入复杂抽象的前提下，使用别名机制可谓恰到好处。例如，设计初期，使用别名机制简单实现\ascii{ErabId}。
+
+\begin{c++}[title={\ttfamily{设计初期}}]
+typedef unsigned ErabId; 
+\end{c++}
+
+有人质疑在开始便引入过度的抽象，是一件危险的事情。但是，\ascii{ErabId}的抽象，实现成本极低，收益却颇高，是一件稳赚不赔的买卖，何乐而不为呢？相对客户代码到处充斥\ascii{unsigned}，使用抽象的\ascii{ErabId}，相对更加稳定。随着设计的演进，别名机制极有可能升级为\emph{类}，这是一个很自然的演进过程。
+
+\begin{c++}[title={\ttfamily{设计升级：使用类替代别名机制}}]
+struct ErabId {
+  explicit ErabId(unsigned id) : id(id) {
+  }
+
+  bool isSrb0() const {
+    return id == 0;
+  }
+
+  bool isSrb1() const {
+    return id == 1;
+  }
+
+private:
+  unsigned id;
+};
+\end{c++}
+
+\subsubsection{别名机制}
+
+在\ascii{C++98}中，使用\ascii{typedef}定义类型别名。在\ascii{C++11}中，使用\emph{别名声明}定义类型别名。例如：
+
+\begin{c++}[title={\ttfamily{别名机制：函数指针}}]
+typedef bool(*CharSpec)(int);     // C++98
+using CharSpec = bool(*)(int);    // C++11
+\end{c++}
+
+一方面，\ascii{using}相对\ascii{typedef}更具表达力；另一方面，\ascii{using}别名更具设计弹性，它可以定义\emph{别名模板}。例如：
+
+\begin{c++}[title={\ttfamily{使用using：定义别名模板}}]
+template <typename Fixture>
+using TestMethod = void(Fixture::*)();
+\end{c++}
+
+如果使用\ascii{typedef}，则需要引入额外的实现复杂度。
+
+\begin{c++}[title={\ttfamily{使用typedef：定义别名模板}}]
+template <typename Fixture>
+struct TestMethod {
+  typedef void(Fixture::*type)();
+};
+\end{c++}
+
+两种实现机制，客户代码实现方式和成本也是截然不同的。如果使用别名模板，客户代码较为直观。
+
+\begin{c++}[title={\ttfamily{使用using：定义别名模板}}]
+template <typename Fixture>
+void run(TestMethod<Fixture>& method) {
+  Fixture self;
+  (self.*method)();
+}
+\end{c++}
+
+如果使用\ascii{typedef}，客户代码引用类型别名时，可能遭遇复杂的\ascii{typename}的语法说明信息。
+
+\begin{c++}[title={\ttfamily{使用using：定义别名模板}}]
+template <typename Fixture>
+void run(typename TestMethod<Fixture>::type& method) {
+  Fixture self;
+  (self.*method)();
+}
+\end{c++}
+
+结论：使用\emph{别名声明}替代\ascii{typedef}。
+
+\subsubsection{模板元编程}
+
+在\cpp{}的模板元编程中，在编译时完成类型演算和常量计算。例如，\ascii{remove\_const}将移除类型\ascii{T}的常量属性。在标准库实现中，常常使用模板特化的技术实现。
+
+\begin{c++}[title={\ttfamily{类型演算：remvoe\_const实现}}]
+template<typename T>
+struct remove_const { 
+  typedef T type; 
+};
+
+template<typename T>
+struct remove_const<const T> { 
+  typedef T type; 
+};
+\end{c++}
+
+但是，当用户使用\ascii{remove\_const}实施类型演算时，饱受\ascii{typename}的困扰。因为\ascii{type}是一个内嵌于\ascii{remove\_const}的类型。例如，实现\ascii{remove\_cv}时，复用既有的\ascii{remove\_const}与\ascii{remove\_volatile}实现，绝对让人喷血。
+
+\begin{c++}[title={\ttfamily{类型演算：remvoe\_cv实现，复用remove\_const与remove\_volatile}}]
+template<typename T>
+struct remove_cv {
+  typedef typename remove_const<
+    typename remove_volatile<T>::type
+  >::type type;
+};
+\end{c++}
+
+\ascii{typename}作为一种实现细节，不应该让用户依赖于此。按照“向稳定的方向依赖”的设计原则，\ascii{C++14}标准使用别名模板，将实现细节隐藏起来。这不仅仅是一种封装技术，它实现了客户代码与标准库实现细节之间的解耦。
+
+\begin{c++}[title={\ttfamily{C++14: 别名模板}}]
+template<typename T>
+using remove_const_t = typename remove_const<T>::type;
+
+template<typename T>
+using remove_volatile_t = typename remove_volatile<T>::type;
+\end{c++}
+
+用户便不用再重复遭罪了。例如，实现\ascii{remove\_cv}时，便可以得到极大的简化。
+
+\begin{c++}[title={\ttfamily{改善remove\_cv： 复用实现}}]
+template<typename T>
+using remove_cv = remove_const_t<remove_volatile_t<T>>;
+\end{c++}
+
+遗憾的是，\ascii{C++11}同时标准化了别名模板的语言特性，及其标准库实现\ascii{<type\_traits>}。但是，直至\ascii{C++14}方才公开支持诸如\ascii{remove\_const\_t}的别名模板，其原因不得而知。
+
+\end{content}
+\end{episode}
 
 \subsection{函数对象}
 
@@ -568,121 +704,6 @@ private:
 };
 \end{minicpp}
 \end{diff}
-
-\begin{episode}{类型别名}
-\begin{content}
-
-\emph{别名机制}是一种轻量级的抽象机制。一方面，使得用户依赖于更稳定的抽象；另一方面，可以极大地改善代码的可读性。例如，在标准库的\ascii{<string>}头文件中，\ascii{std::string}便是使用\ascii{typdef}定义的。
-
-\begin{c++}[title={\ttfamily{标准库: std::string与std::wstring}}]
-typedef basic_string<char> string;
-typedef basic_string<wchar_t> wstring;
-\end{c++}
-
-如果强迫用户使用\code{std::basic\_string<char>}，而不是\ascii{std::string}，不仅增加了用户使用的负担，而且让客户代码充斥了不稳定的实现细节。
-
-\subsubsection{抽象升华}
-
-别名机制相对较为轻量，实现成本也不高。在没有充分理由引入复杂抽象的前提下，使用别名机制可谓恰到好处。例如，设计初期，使用别名机制简单实现\ascii{ErabId}。
-
-\begin{c++}[title={\ttfamily{设计初期: 建议客户使用pass-by-const-reference传递ErabId}}]
-typedef unsigned ErabId; 
-\end{c++}
-
-随着设计的演进，别名机制极有可能升华为了类，这是一个很自然的重构过程。
-
-\begin{c++}[title={\ttfamily{设计升华：使用类替代别名机制}}]
-struct ErabId {
-  explicit ErabId(unsigned id) : id(id) {
-  }
-
-  bool isSrb0() const {
-    return id == 0;
-  }
-
-  bool isSrb1() const {
-    return id == 1;
-  }
-
-private:
-  unsigned id;
-};
-\end{c++}
-
-\subsubsection{别名机制}
-
-在\ascii{C++98}中，使用\ascii{typedef}定义类型别名。在\ascii{C++11}中，可以使用\ascii{using}定义类型别名。
-
-\begin{c++}[title={\ttfamily{别名机制：函数指针}}]
-typedef bool(*CharSpec)(int);     // C++98
-using CharSpec = bool(*)(int);    // C++11
-\end{c++}
-
-一方面，\ascii{using}相对\ascii{typedef}更具表达力；另一方面，\ascii{using}别名更具设计弹性，它可以定义\emph{别名模板}。
-
-
-\begin{c++}[title={\ttfamily{使用using：定义别名模板}}]
-template <typename Fixture>
-using TestMethod = void(Fixture::*)();
-\end{c++}
-
-如果使用\ascii{typedef}，则需要引入额外的实现复杂度。
-
-\begin{c++}[title={\ttfamily{使用typedef：定义别名模板}}]
-template <typename Fixture>
-struct TestMethod {
-  typedef void(Fixture::*method)();
-};
-\end{c++}
-
-\subsubsection{模板元编程}
-
-在\cpp{}的模板元编程中，在编译时完成类型的演算。例如，\ascii{remove\_const}将移除类型\ascii{T}的常量属性。
-
-\begin{c++}[title={\ttfamily{类型演算：remvoe\_const实现}}]
-template<typename T>
-struct remove_const { 
-  typedef T type; 
-};
-
-template<typename T>
-struct remove_const<const T> { 
-  typedef T type; 
-};
-\end{c++}
-
-但是，当用户使用\ascii{remove\_const}实施类型演算时，饱受\ascii{typename}的困扰，因为\ascii{type}是一个内嵌于\ascii{remove\_const}的类型。例如，实现\ascii{remove\_cv}时，复用既有的\ascii{remove\_const}与\ascii{remove\_volatile}实现，绝对让人喷血。
-
-\begin{c++}[title={\ttfamily{类型演算：remvoe\_cv实现}}]
-template<typename T>
-struct remove_cv {
-  typedef typename remove_const<
-    typename remove_volatile<T>::type
-  >::type type;
-};
-\end{c++}
-
-因此，\ascii{C++14}标准使用别名模板，将实现细节隐藏起来。
-
-\begin{c++}[title={\ttfamily{C++14: 别名模板}}]
-template<typename T>
-using remove_const_t = typename remove_const<T>::type;
-
-template<typename T>
-using remove_volatile_t = typename remove_volatile<T>::type;
-\end{c++}
-
-用户便不用再遭这个罪了。例如，实现\ascii{remove\_cv}时便可以得到极大的简化。
-
-\begin{c++}[title={\ttfamily{改善remove\_cv： 复用实现}}]
-template<typename T>
-using remove_cv = remove_const_t<remove_volatile_t<T>>;
-\end{c++}
-
-遗憾的是，诸如\ascii{remove\_const\_t}的别名模板，直至\ascii{C++14}才被标准化。
-
-\end{content}
-\end{episode}
 
 \begin{episode}{TDD: 测试驱动开发}
 \begin{content}

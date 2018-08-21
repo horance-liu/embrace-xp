@@ -531,4 +531,46 @@ int TestSuite::countTestCases() const {
 
 \ascii{C++11}的\ascii{lambda}表达式附加\emph{捕获列表}，方便用户根据场景灵活定制。\cpp{}始终秉承自由的哲学观，致力寻找抽象与性能之间的平衡点。相反，相对大部分编程语言实现\ascii{lambda}表达式时，默认地捕获整个上下文，在内存与性能方面\cpp{}优势非常明显。
 
+\begin{episode}{迭代器}
+\begin{content}
+
+\subsection{std::begin}
+
+\begin{c++}
+template<typename C>
+auto begin(C& c) -> decltype(c.begin()) { 
+  return c.begin(); 
+}
+
+template<typename C>
+auto begin(const C& c) -> decltype(c.begin()) { 
+  return c.begin(); 
+}
+
+template<typename T, size_t N>
+constexpr T* begin(T (&arr)[N]) { 
+  return arr; 
+}
+
+template<class T>
+constexpr const T* begin(initializer_list<T> l) noexcept { 
+  return l.begin(); 
+}
+\end{c++}
+
+\subsection{std::cbegin}
+
+\begin{c++}
+template<typename C>
+constexpr auto
+cbegin(const C& c) -> decltype(std::begin(c)) { 
+  return std::begin(c);
+}
+\end{c++}
+
 \end{content}
+\end{episode}
+
+\end{content}
+
+
